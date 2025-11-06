@@ -149,7 +149,9 @@ jobs:
         run: pnpm run cli:build
 
       - name: Build Windows ${{ matrix.arch }} App
+        shell: pwsh
         run: |
+          Write-Host "Building Windows ${{ matrix.arch }} app..."
           node dist/cli.js ${{ env.APP_URL }} `
             --name ${{ env.APP_NAME }} `
             --icon ${{ env.APP_ICON }} `
@@ -160,13 +162,41 @@ jobs:
       - name: Find and rename MSI
         shell: pwsh
         run: |
-          # Find MSI file
-          $msiPath = Get-ChildItem -Path "src-tauri\target" -Recurse -Filter "*.msi" | Select-Object -First 1
+          # Determine target triple
+          $targetTriple = if ("${{ matrix.arch }}" -eq "x64") {
+            "x86_64-pc-windows-msvc"
+          } else {
+            "aarch64-pc-windows-msvc"
+          }
 
-          if (-not $msiPath) {
-            Write-Error "MSI file not found"
+          Write-Host "Looking for MSI in target: $targetTriple"
+
+          # Expected MSI path
+          $msiDir = "src-tauri\target\$targetTriple\release\bundle\msi"
+
+          # List directory contents for debugging
+          Write-Host "Checking directory: $msiDir"
+          if (Test-Path $msiDir) {
+            Write-Host "Directory contents:"
+            Get-ChildItem -Path $msiDir
+          } else {
+            Write-Host "MSI directory not found! Searching entire target directory..."
+            Get-ChildItem -Path "src-tauri\target" -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "Found MSI: $($_.FullName)"
+            }
+            Write-Error "Expected MSI directory not found: $msiDir"
             exit 1
           }
+
+          # Find MSI file
+          $msiPath = Get-ChildItem -Path $msiDir -Filter "*.msi" | Select-Object -First 1
+
+          if (-not $msiPath) {
+            Write-Error "MSI file not found in $msiDir"
+            exit 1
+          }
+
+          Write-Host "Found MSI: $($msiPath.FullName)"
 
           # Create output directory
           New-Item -Path "output" -ItemType Directory -Force
