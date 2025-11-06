@@ -57,6 +57,7 @@ EOF
 #### Automatic Build (All Configs)
 
 1. Create and push a tag:
+
    ```bash
    git tag v1.0.0 -m "Release v1.0.0"
    git push origin v1.0.0
@@ -109,11 +110,13 @@ See [`build-configs/README.md`](build-configs/README.md) for detailed configurat
 ## Workflow Comparison
 
 ### Old Workflow (`my_tag.yaml`)
+
 - ❌ Hardcoded parameters in YAML
 - ❌ Only builds one app
 - ❌ Difficult to maintain multiple apps
 
 ### New Workflow (`build-from-config.yaml`)
+
 - ✅ Configuration-driven
 - ✅ Supports multiple apps
 - ✅ Easy to add new apps (just create a JSON file)
@@ -264,16 +267,18 @@ ls -la ./icons/myapp.png
 ### Platform disabled
 
 Check config:
+
 ```bash
 jq '.platforms' build-configs/myapp.json
 ```
 
 Enable platform:
+
 ```json
 {
   "platforms": {
     "macos": {
-      "enabled": true,  // <- Change to true
+      "enabled": true, // <- Change to true
       "targets": ["universal"]
     }
   }
@@ -319,14 +324,14 @@ Build only specific configs:
 
 ## Summary
 
-| Feature | Old Workflow | New Workflow |
-|---------|-------------|--------------|
-| Config Method | Hardcoded in YAML | JSON files |
-| Multiple Apps | No | Yes |
-| Easy to Maintain | No | Yes |
-| Manual Build | No | Yes |
-| Auto Build on Tag | Yes | Yes |
-| Platform Selection | All | Per-config |
-| Icon Management | Single | Per-app |
+| Feature            | Old Workflow      | New Workflow |
+| ------------------ | ----------------- | ------------ |
+| Config Method      | Hardcoded in YAML | JSON files   |
+| Multiple Apps      | No                | Yes          |
+| Easy to Maintain   | No                | Yes          |
+| Manual Build       | No                | Yes          |
+| Auto Build on Tag  | Yes               | Yes          |
+| Platform Selection | All               | Per-config   |
+| Icon Management    | Single            | Per-app      |
 
 **Recommendation**: Use the new config-driven workflow for better flexibility and maintainability.

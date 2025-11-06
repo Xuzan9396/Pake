@@ -106,11 +106,13 @@ Create a new JSON file in this directory (e.g., `myapp.json`):
 ### 3. Build via GitHub Actions
 
 **Manual Trigger:**
+
 - Go to Actions → "Build from Config"
 - Select config file from dropdown
 - Click "Run workflow"
 
 **Automatic on Tag:**
+
 - Create and push a tag: `git tag v1.0.0 && git push origin v1.0.0`
 - All enabled configs will be built automatically
 - Release will be created with all build artifacts
@@ -174,6 +176,7 @@ Create a new JSON file in this directory (e.g., `myapp.json`):
 ## Config Validation
 
 Before building, ensure:
+
 - ✅ Icon file exists at specified path
 - ✅ URL is valid and accessible
 - ✅ Width/height are reasonable (min: 400, max: 4096)

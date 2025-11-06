@@ -148,26 +148,28 @@ vinted 打包新版本           # 缺少 ##
 
 ### 字段说明
 
-| 字段 | 说明 | 必填 | 示例 |
-|------|------|------|------|
-| `name` | 应用名称 | ✅ | `"vinted"` |
-| `url` | 要打包的网址 | ✅ | `"http://45.77.62.32:8989/"` |
-| `icon` | 图标路径（相对于项目根目录） | ✅ | `"./111.jpg"` |
-| `width` | 窗口宽度 | ✅ | `1920` |
-| `height` | 窗口高度 | ✅ | `1080` |
-| `platforms.macos.enabled` | 是否构建 macOS | ✅ | `true` |
-| `platforms.macos.targets` | macOS 架构 | ✅ | `["universal"]` |
-| `platforms.windows.enabled` | 是否构建 Windows | ✅ | `true` |
-| `platforms.windows.targets` | Windows 架构 | ✅ | `["x64", "arm64"]` |
+| 字段                        | 说明                         | 必填 | 示例                         |
+| --------------------------- | ---------------------------- | ---- | ---------------------------- |
+| `name`                      | 应用名称                     | ✅   | `"vinted"`                   |
+| `url`                       | 要打包的网址                 | ✅   | `"http://45.77.62.32:8989/"` |
+| `icon`                      | 图标路径（相对于项目根目录） | ✅   | `"./111.jpg"`                |
+| `width`                     | 窗口宽度                     | ✅   | `1920`                       |
+| `height`                    | 窗口高度                     | ✅   | `1080`                       |
+| `platforms.macos.enabled`   | 是否构建 macOS               | ✅   | `true`                       |
+| `platforms.macos.targets`   | macOS 架构                   | ✅   | `["universal"]`              |
+| `platforms.windows.enabled` | 是否构建 Windows             | ✅   | `true`                       |
+| `platforms.windows.targets` | Windows 架构                 | ✅   | `["x64", "arm64"]`           |
 
 ### 平台配置
 
 **macOS targets**:
+
 - `"universal"` - 包含 Intel + Apple Silicon（推荐）
 - `"intel"` - 仅 Intel
 - `"apple"` - 仅 Apple Silicon
 
 **Windows targets**:
+
 - `"x64"` - 64位 Intel/AMD
 - `"arm64"` - ARM64 架构
 
@@ -245,6 +247,7 @@ git push origin main
 ### Q1: 提交后没有触发构建？
 
 **检查清单**：
+
 1. ✅ Commit message 格式正确：`#配置名#`
 2. ✅ 配置文件存在：`build-configs/配置名.json`
 3. ✅ 推送到了 main 或 dev 分支
@@ -253,11 +256,13 @@ git push origin main
 ### Q2: 构建失败？
 
 **常见原因**：
+
 1. 图标文件不存在或路径错误
 2. URL 无法访问
 3. 配置文件格式错误（JSON 语法）
 
 **解决方法**：
+
 1. 查看 Actions 日志
 2. 检查配置文件：`jq . build-configs/vinted.json`
 3. 验证图标存在：`ls -la 111.jpg`
@@ -280,12 +285,14 @@ git push origin main
 当前版本不自动创建 Release，只上传到 Artifacts。
 
 如需创建 Release，可以：
+
 1. 使用 tag 触发（`git tag v1.0.0 && git push origin v1.0.0`）
 2. 手动从 Artifacts 下载后上传到 Releases
 
 ### Q6: 如何同时打包多个应用？
 
 **方法 1**：多次提交
+
 ```bash
 git commit -m "#app1#更新"
 git push
@@ -294,19 +301,20 @@ git push
 ```
 
 **方法 2**：使用 tag 触发（会打包所有配置）
+
 ```bash
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
 ## 对比：Auto Build vs Tag Build
 
-| 特性 | Auto Build (commit message) | Tag Build |
-|------|----------------------------|-----------|
-| 触发方式 | Commit message `#配置名#` | 推送 tag |
-| 打包范围 | 单个配置 | 所有配置 |
-| 适用场景 | 快速测试、单独更新 | 正式发布 |
-| 产物位置 | Artifacts (7天) | Release (永久) |
-| 使用频率 | 频繁使用 | 正式版本 |
+| 特性     | Auto Build (commit message) | Tag Build      |
+| -------- | --------------------------- | -------------- |
+| 触发方式 | Commit message `#配置名#`   | 推送 tag       |
+| 打包范围 | 单个配置                    | 所有配置       |
+| 适用场景 | 快速测试、单独更新          | 正式发布       |
+| 产物位置 | Artifacts (7天)             | Release (永久) |
+| 使用频率 | 频繁使用                    | 正式版本       |
 
 ## 最佳实践
 
@@ -358,6 +366,7 @@ Pake/
 ## 技术支持
 
 遇到问题？
+
 1. 查看 [配置文档](build-configs/README.md)
 2. 查看 [GitHub Actions 日志](https://github.com/你的用户名/Pake/actions)
 3. 检查 [Workflow 文件](.github/workflows/auto-build.yaml)
