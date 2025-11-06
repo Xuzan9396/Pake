@@ -1,0 +1,238 @@
+name: Build and Release Vinted App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  APP_URL: 'http://45.77.62.32:8989/'
+  APP_NAME: 'vinted'
+  APP_ICON: './111.jpg'
+  APP_WIDTH: '1920'
+  APP_HEIGHT: '1080'
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.15.0'
+
+jobs:
+  build-macos:
+    name: Build macOS Universal
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build CLI
+        run: pnpm run cli:build
+
+      - name: Build macOS Universal App
+        env:
+          PAKE_CREATE_APP: 1
+        run: |
+          node dist/cli.js ${{ env.APP_URL }} \
+            --name ${{ env.APP_NAME }} \
+            --icon ${{ env.APP_ICON }} \
+            --width ${{ env.APP_WIDTH }} \
+            --height ${{ env.APP_HEIGHT }} \
+            --targets universal
+
+      - name: Package DMG
+        run: |
+          # Find the .app file
+          APP_PATH=$(find . -name "${{ env.APP_NAME }}.app" -type d | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: App not found"
+            exit 1
+          fi
+
+          # Create DMG using hdiutil
+          mkdir -p output
+          DMG_NAME="${{ env.APP_NAME }}_${{ github.ref_name }}_macos_universal.dmg"
+
+          # Create temporary dmg directory
+          mkdir -p dmg_temp
+          cp -R "$APP_PATH" dmg_temp/
+
+          # Create DMG
+          hdiutil create -volname "${{ env.APP_NAME }}" -srcfolder dmg_temp -ov -format UDZO "output/$DMG_NAME"
+
+          # Cleanup
+          rm -rf dmg_temp
+
+          echo "DMG created: output/$DMG_NAME"
+          ls -lh output/
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: output/*.dmg
+          retention-days: 3
+
+  build-windows:
+    name: Build Windows ${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-msvc
+          targets: ${{ matrix.arch == 'x64' && 'x86_64-pc-windows-msvc' || 'aarch64-pc-windows-msvc' }}
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-cargo-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build CLI
+        run: pnpm run cli:build
+
+      - name: Build Windows ${{ matrix.arch }} App
+        run: |
+          node dist/cli.js ${{ env.APP_URL }} `
+            --name ${{ env.APP_NAME }} `
+            --icon ${{ env.APP_ICON }} `
+            --width ${{ env.APP_WIDTH }} `
+            --height ${{ env.APP_HEIGHT }} `
+            --targets ${{ matrix.arch }}
+
+      - name: Find and rename MSI
+        shell: pwsh
+        run: |
+          # Find MSI file
+          $msiPath = Get-ChildItem -Path "src-tauri\target" -Recurse -Filter "*.msi" | Select-Object -First 1
+
+          if (-not $msiPath) {
+            Write-Error "MSI file not found"
+            exit 1
+          }
+
+          # Create output directory
+          New-Item -Path "output" -ItemType Directory -Force
+
+          # Copy and rename MSI
+          $newName = "${{ env.APP_NAME }}_${{ github.ref_name }}_windows_${{ matrix.arch }}.msi"
+          Copy-Item -Path $msiPath.FullName -Destination "output\$newName"
+
+          Write-Host "MSI created: output\$newName"
+          Get-ChildItem -Path "output"
+
+      - name: Upload Windows ${{ matrix.arch }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: output/*.msi
+          retention-days: 3
+
+  create-release:
+    name: Create Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: |
+          echo "Artifacts structure:"
+          ls -R artifacts/
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          name: Vinted App ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          body: |
+            ## Vinted Desktop App ${{ github.ref_name }}
+
+            ### Downloads
+
+            #### macOS
+            - **Universal (Intel + Apple Silicon)**: `vinted_${{ github.ref_name }}_macos_universal.dmg`
+
+            #### Windows
+            - **x64**: `vinted_${{ github.ref_name }}_windows_x64.msi`
+            - **ARM64**: `vinted_${{ github.ref_name }}_windows_arm64.msi`
+
+            ### Installation
+
+            **macOS**: Download the DMG file, open it, and drag the app to Applications folder.
+
+            **Windows**: Download the MSI file for your architecture and run it.
+
+            ---
+
+            Built with [Pake](https://github.com/tw93/Pake)
+          artifacts: "artifacts/**/*"
+          token: ${{ secrets.PAKE_TOKEN }}
+          draft: false
+          prerelease: false
+          allowUpdates: true
