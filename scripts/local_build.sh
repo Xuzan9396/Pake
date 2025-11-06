@@ -17,11 +17,16 @@ echo ""
 
 # 检查参数
 CONFIG_FILE=$1
+ARCH=$2  # 可选架构参数
+
 if [ -z "$CONFIG_FILE" ]; then
   echo -e "${RED}❌ Error: Config file not specified${NC}"
   echo ""
-  echo "Usage: $0 <config-file>"
+  echo "Usage: $0 <config-file> [arch]"
   echo "Example: $0 kpi_drojian.json"
+  echo "Example: $0 kpi_drojian.json apple    # macOS ARM64 only"
+  echo "Example: $0 kpi_drojian.json intel    # macOS Intel only"
+  echo "Example: $0 kpi_drojian.json universal # macOS Universal"
   echo ""
   echo "Available configs:"
   ls "$PROJECT_DIR/build-configs/"*.json 2>/dev/null | xargs -n 1 basename | sed 's/^/  - /'
@@ -117,19 +122,28 @@ PLATFORM=$(uname -s)
 case "$PLATFORM" in
   Darwin)
     PLATFORM_NAME="macOS"
-    TARGET="universal"
+    # 如果用户指定了架构，使用指定的；否则使用配置文件中的第一个
+    if [ -n "$ARCH" ]; then
+      TARGET="$ARCH"
+    else
+      # 从配置文件读取第一个 macOS target
+      TARGET=$(jq -r '.platforms.macos.targets[0]' "$CONFIG_PATH")
+      if [ "$TARGET" = "null" ] || [ -z "$TARGET" ]; then
+        TARGET="universal"
+      fi
+    fi
     BUILD_ENV="PAKE_CREATE_APP=1"
     OUTPUT_TYPE=".app"
     ;;
   Linux)
     PLATFORM_NAME="Linux"
-    TARGET="deb"
+    TARGET="${ARCH:-deb}"
     BUILD_ENV=""
     OUTPUT_TYPE=".deb"
     ;;
   MINGW*|MSYS*|CYGWIN*)
     PLATFORM_NAME="Windows"
-    TARGET="x64"
+    TARGET="${ARCH:-x64}"
     BUILD_ENV=""
     OUTPUT_TYPE=".msi"
     ;;

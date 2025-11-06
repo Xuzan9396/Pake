@@ -67,6 +67,7 @@ jobs:
       width: ${{ steps.read.outputs.width }}
       height: ${{ steps.read.outputs.height }}
       macos_enabled: ${{ steps.read.outputs.macos_enabled }}
+      macos_targets: ${{ steps.read.outputs.macos_targets }}
       windows_enabled: ${{ steps.read.outputs.windows_enabled }}
       windows_targets: ${{ steps.read.outputs.windows_targets }}
     steps:
@@ -92,15 +93,23 @@ jobs:
           echo "macos_enabled=$(jq -r '.platforms.macos.enabled' $CONFIG_FILE)" >> $GITHUB_OUTPUT
           echo "windows_enabled=$(jq -r '.platforms.windows.enabled' $CONFIG_FILE)" >> $GITHUB_OUTPUT
 
+          # macOS targets
+          MACOS_TARGETS=$(jq -c '.platforms.macos.targets' $CONFIG_FILE)
+          echo "macos_targets=$MACOS_TARGETS" >> $GITHUB_OUTPUT
+
           # Windows targets
           WINDOWS_TARGETS=$(jq -c '.platforms.windows.targets' $CONFIG_FILE)
           echo "windows_targets=$WINDOWS_TARGETS" >> $GITHUB_OUTPUT
 
   build-macos:
-    name: Build macOS Universal
+    name: Build macOS ${{ matrix.arch }}
     needs: [parse-tag, read-config]
     if: needs.read-config.outputs.macos_enabled == 'true'
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.read-config.outputs.macos_targets) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -119,7 +128,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: |
+            ${{
+              matrix.arch == 'universal' && 'aarch64-apple-darwin,x86_64-apple-darwin' ||
+              matrix.arch == 'apple' && 'aarch64-apple-darwin' ||
+              matrix.arch == 'intel' && 'x86_64-apple-darwin' ||
+              'aarch64-apple-darwin,x86_64-apple-darwin'
+            }}
 
       - name: Rust cache
         uses: actions/cache@v4
@@ -140,11 +155,11 @@ jobs:
       - name: Build CLI
         run: pnpm run cli:build
 
-      - name: Build macOS Universal App
+      - name: Build macOS ${{ matrix.arch }} App
         env:
           PAKE_CREATE_APP: 1
         run: |
-          echo "Building ${{ needs.read-config.outputs.name }} v${{ needs.parse-tag.outputs.version }}"
+          echo "Building ${{ needs.read-config.outputs.name }} v${{ needs.parse-tag.outputs.version }} for macOS ${{ matrix.arch }}"
           echo "URL: ${{ needs.read-config.outputs.url }}"
 
           node dist/cli.js ${{ needs.read-config.outputs.url }} \
@@ -152,7 +167,7 @@ jobs:
             --icon ${{ needs.read-config.outputs.icon }} \
             --width ${{ needs.read-config.outputs.width }} \
             --height ${{ needs.read-config.outputs.height }} \
-            --targets universal
+            --targets ${{ matrix.arch }}
 
       - name: Package DMG
         run: |
@@ -172,7 +187,7 @@ jobs:
           echo "Found app: $APP_PATH"
 
           mkdir -p output
-          DMG_NAME="${{ needs.read-config.outputs.name }}_v${{ needs.parse-tag.outputs.version }}_macos_universal.dmg"
+          DMG_NAME="${{ needs.read-config.outputs.name }}_v${{ needs.parse-tag.outputs.version }}_macos_${{ matrix.arch }}.dmg"
 
           mkdir -p dmg_temp
           cp -R "$APP_PATH" dmg_temp/
@@ -187,7 +202,7 @@ jobs:
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.parse-tag.outputs.config_name }}-macos-universal
+          name: ${{ needs.parse-tag.outputs.config_name }}-macos-${{ matrix.arch }}
           path: output/*.dmg
           retention-days: 3
 

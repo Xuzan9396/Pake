@@ -1,16 +1,16 @@
 {
   "name": "kpi_drojian",
-  "url": "https://kpi.drojian.dev/report/report-daily/my-list",
-  "icon": "./imgs/kpi_drojian",
+  "url": "https://kpi.drojian.dev/",
+  "icon": "./imgs/kpi_drojian.jpg",
   "width": 1920,
   "height": 1080,
   "platforms": {
     "macos": {
       "enabled": true,
-      "targets": ["universal"]
+      "targets": ["universal", "apple", "intel"]
     },
     "windows": {
-      "enabled": true,
+      "enabled": false,
       "targets": ["x64", "arm64"]
     },
     "linux": {
@@ -23,6 +23,7 @@
     "resizable": true,
     "transparent": false,
     "alwaysOnTop": false,
-    "hideTitleBar": false
+    "hideTitleBar": false,
+    "debug": true
   }
 }
