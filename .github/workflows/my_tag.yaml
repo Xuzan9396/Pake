@@ -201,6 +201,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -242,7 +243,7 @@ jobs:
 
             Built with [Pake](https://github.com/tw93/Pake)
           artifacts: "artifacts/**/*"
-          token: ${{ secrets.PAKE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
           prerelease: false
           allowUpdates: true
