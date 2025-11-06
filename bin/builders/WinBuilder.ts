@@ -23,6 +23,14 @@ export default class WinBuilder extends BaseBuilder {
     return `${name}_${tauriConfig.version}_${targetArch}_${language}`;
   }
 
+  protected getArchDisplayName(arch: string): string {
+    // Windows uses 'arm64' in MSI filenames, not 'aarch64'
+    if (arch === 'arm64') {
+      return 'arm64';
+    }
+    return super.getArchDisplayName(arch);
+  }
+
   protected getBuildCommand(packageManager: string = 'pnpm'): string {
     const configPath = path.join('src-tauri', '.pake', 'tauri.conf.json');
     const buildTarget = this.getTauriTarget(this.buildArch, 'win32');
