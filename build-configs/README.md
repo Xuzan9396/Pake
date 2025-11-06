@@ -43,9 +43,8 @@ git push origin myapp-v2.0.0
 # → 只会读取 build-configs/myapp.json
 
 
-This directory contains build configuration files for packaging different applications with Pake.
-
-## Configuration File Format
+git tag kpi_drojian-v0.0.1 -m "Release kpi_drojian v0.0.1"
+git push origin kpi_drojian-v0.0.1
 
 Each JSON file represents one application to package. The file name becomes the config ID.
 
