@@ -266,3 +266,27 @@ PAKE_CREATE_APP=1 node dist/cli.js http://45.77.62.32:8989/ \
 - 如果日志显示"Intercepted"但文件未下载，检查 Tauri 通知权限
 - 如果没有任何拦截日志，说明前端使用了其他方式触发导出
 - 查看 Network 面板确认实际请求的 URL 格式
+  选项 A：删除旧 tag，重新创建 v0.0.1（推荐）
+
+  # 删除本地 tag
+  git tag -d v0.0.1
+
+  # 删除远程 tag
+  git push origin :refs/tags/v0.0.1
+
+  # 重新创建 tag
+  git tag v0.0.1 -m "Initial release - fixed Windows ARM64"
+
+  # 推送新 tag
+  git push origin v0.0.1
+
+  选项 B：创建新版本 v0.0.2
+
+  # 创建新 tag
+  git tag v0.0.2 -m "Fix Windows ARM64 build"
+
+  # 推送 tag
+  git push origin v0.0.2
+
+
+git pull --rebase origin main && git push origin main
