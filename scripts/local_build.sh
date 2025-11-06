@@ -17,16 +17,19 @@ echo ""
 
 # 检查参数
 CONFIG_FILE=$1
-ARCH=$2  # 可选架构参数
+ARCH=$2           # 可选架构参数
+AUTO_DMG=$3       # 可选：自动打包 DMG（dmg/msi）
 
 if [ -z "$CONFIG_FILE" ]; then
   echo -e "${RED}❌ Error: Config file not specified${NC}"
   echo ""
-  echo "Usage: $0 <config-file> [arch]"
-  echo "Example: $0 kpi_drojian.json"
-  echo "Example: $0 kpi_drojian.json apple    # macOS ARM64 only"
-  echo "Example: $0 kpi_drojian.json intel    # macOS Intel only"
-  echo "Example: $0 kpi_drojian.json universal # macOS Universal"
+  echo "Usage: $0 <config-file> [arch] [format]"
+  echo ""
+  echo "Examples:"
+  echo "  $0 kpi_drojian.json                    # Build .app only"
+  echo "  $0 kpi_drojian.json apple              # Build ARM64 .app"
+  echo "  $0 kpi_drojian.json apple dmg          # Build ARM64 and package as DMG"
+  echo "  $0 kpi_drojian.json universal dmg      # Build Universal and package as DMG"
   echo ""
   echo "Available configs:"
   ls "$PROJECT_DIR/build-configs/"*.json 2>/dev/null | xargs -n 1 basename | sed 's/^/  - /'
@@ -249,15 +252,66 @@ case "$PLATFORM" in
     # 查找 .app 文件
     APP_FILES=$(find "$PROJECT_DIR" -maxdepth 1 -name "*.app" -type d 2>/dev/null)
     if [ -n "$APP_FILES" ]; then
-      echo -e "${GREEN}✅ Build completed!${NC}"
+      echo -e "${GREEN}✅ App build completed!${NC}"
       echo ""
-      echo "Generated files:"
-      echo "$APP_FILES" | while read -r app; do
-        SIZE=$(du -sh "$app" | cut -f1)
-        echo "  📦 $(basename "$app") ($SIZE)"
-      done
+
+      APP_PATH=$(echo "$APP_FILES" | head -n 1)
+      APP_SIZE=$(du -sh "$APP_PATH" | cut -f1)
+      echo "Generated .app:"
+      echo "  📦 $(basename "$APP_PATH") ($APP_SIZE)"
       echo ""
-      echo -e "${GREEN}To run: open \"$(echo "$APP_FILES" | head -n 1)\"${NC}"
+
+      # 检查是否自动打包 DMG
+      CREATE_DMG=false
+      if [ "$AUTO_DMG" = "dmg" ]; then
+        CREATE_DMG=true
+      else
+        # 询问是否打包成 DMG
+        echo -e "${YELLOW}Package as DMG? (y/N)${NC}"
+        read -n 1 -r RESPONSE
+        echo ""
+        if [[ $RESPONSE =~ ^[Yy]$ ]]; then
+          CREATE_DMG=true
+        fi
+      fi
+
+      if [ "$CREATE_DMG" = true ]; then
+        echo ""
+        echo -e "${BLUE}📦 Creating DMG...${NC}"
+
+        # 确定 DMG 名称
+        if [ -n "$ARCH" ]; then
+          DMG_NAME="${NAME}_${TARGET}.dmg"
+        else
+          DMG_NAME="${NAME}.dmg"
+        fi
+
+        # 创建临时目录
+        mkdir -p dmg_temp
+        cp -R "$APP_PATH" dmg_temp/
+
+        # 创建 DMG
+        hdiutil create -volname "$NAME" -srcfolder dmg_temp -ov -format UDZO "$DMG_NAME"
+
+        # 清理临时目录
+        rm -rf dmg_temp
+
+        if [ -f "$DMG_NAME" ]; then
+          DMG_SIZE=$(du -sh "$DMG_NAME" | cut -f1)
+          echo ""
+          echo -e "${GREEN}✅ DMG created!${NC}"
+          echo "  📦 $DMG_NAME ($DMG_SIZE)"
+          echo ""
+          echo -e "${GREEN}To install: open \"$DMG_NAME\"${NC}"
+        else
+          echo -e "${RED}❌ DMG creation failed${NC}"
+        fi
+      else
+        echo ""
+        echo -e "${GREEN}To run: open \"$APP_PATH\"${NC}"
+        echo -e "${BLUE}To create DMG manually:${NC}"
+        echo "  hdiutil create -volname \"$NAME\" -srcfolder \"$APP_PATH\" -ov -format UDZO \"${NAME}.dmg\""
+      fi
     else
       echo -e "${YELLOW}⚠️  No .app file found in project root${NC}"
       echo "Searching subdirectories..."
