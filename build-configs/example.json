@@ -8,7 +8,7 @@
   "platforms": {
     "macos": {
       "enabled": true,
-      "targets": ["universal"]
+      "targets": ["universal", "apple", "intel"]
     },
     "windows": {
       "enabled": true,

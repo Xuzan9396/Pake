@@ -70,6 +70,12 @@ jobs:
       macos_targets: ${{ steps.read.outputs.macos_targets }}
       windows_enabled: ${{ steps.read.outputs.windows_enabled }}
       windows_targets: ${{ steps.read.outputs.windows_targets }}
+      debug: ${{ steps.read.outputs.debug }}
+      hide_title_bar: ${{ steps.read.outputs.hide_title_bar }}
+      fullscreen: ${{ steps.read.outputs.fullscreen }}
+      always_on_top: ${{ steps.read.outputs.always_on_top }}
+      proxy_url: ${{ steps.read.outputs.proxy_url }}
+      user_agent: ${{ steps.read.outputs.user_agent }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -100,6 +106,14 @@ jobs:
           # Windows targets
           WINDOWS_TARGETS=$(jq -c '.platforms.windows.targets' $CONFIG_FILE)
           echo "windows_targets=$WINDOWS_TARGETS" >> $GITHUB_OUTPUT
+
+          # Options
+          echo "debug=$(jq -r '.options.debug // false' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "hide_title_bar=$(jq -r '.options.hideTitleBar // false' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "fullscreen=$(jq -r '.options.fullscreen // false' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "always_on_top=$(jq -r '.options.alwaysOnTop // false' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "proxy_url=$(jq -r '.options.proxyUrl // ""' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "user_agent=$(jq -r '.options.userAgent // ""' $CONFIG_FILE)" >> $GITHUB_OUTPUT
 
   build-macos:
     name: Build macOS ${{ matrix.arch }}
@@ -161,13 +175,26 @@ jobs:
         run: |
           echo "Building ${{ needs.read-config.outputs.name }} v${{ needs.parse-tag.outputs.version }} for macOS ${{ matrix.arch }}"
           echo "URL: ${{ needs.read-config.outputs.url }}"
+          echo "Debug: ${{ needs.read-config.outputs.debug }}"
 
-          node dist/cli.js ${{ needs.read-config.outputs.url }} \
+          # Build base command
+          CMD="node dist/cli.js ${{ needs.read-config.outputs.url }} \
             --name ${{ needs.read-config.outputs.name }} \
             --icon ${{ needs.read-config.outputs.icon }} \
             --width ${{ needs.read-config.outputs.width }} \
             --height ${{ needs.read-config.outputs.height }} \
-            --targets ${{ matrix.arch }}
+            --targets ${{ matrix.arch }}"
+
+          # Add optional parameters
+          [ "${{ needs.read-config.outputs.debug }}" = "true" ] && CMD="$CMD --debug"
+          [ "${{ needs.read-config.outputs.hide_title_bar }}" = "true" ] && CMD="$CMD --hide-title-bar"
+          [ "${{ needs.read-config.outputs.fullscreen }}" = "true" ] && CMD="$CMD --fullscreen"
+          [ "${{ needs.read-config.outputs.always_on_top }}" = "true" ] && CMD="$CMD --always-on-top"
+          [ -n "${{ needs.read-config.outputs.proxy_url }}" ] && CMD="$CMD --proxy-url ${{ needs.read-config.outputs.proxy_url }}"
+          [ -n "${{ needs.read-config.outputs.user_agent }}" ] && CMD="$CMD --user-agent '${{ needs.read-config.outputs.user_agent }}'"
+
+          echo "Command: $CMD"
+          eval $CMD
 
       - name: Package DMG
         run: |
@@ -258,13 +285,40 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Building ${{ needs.read-config.outputs.name }} v${{ needs.parse-tag.outputs.version }} for Windows ${{ matrix.arch }}"
+          Write-Host "Debug: ${{ needs.read-config.outputs.debug }}"
 
-          node dist/cli.js ${{ needs.read-config.outputs.url }} `
-            --name ${{ needs.read-config.outputs.name }} `
-            --icon ${{ needs.read-config.outputs.icon }} `
-            --width ${{ needs.read-config.outputs.width }} `
-            --height ${{ needs.read-config.outputs.height }} `
-            --targets ${{ matrix.arch }}
+          # Build base command
+          $cmd = @(
+            "dist/cli.js"
+            "${{ needs.read-config.outputs.url }}"
+            "--name"
+            "${{ needs.read-config.outputs.name }}"
+            "--icon"
+            "${{ needs.read-config.outputs.icon }}"
+            "--width"
+            "${{ needs.read-config.outputs.width }}"
+            "--height"
+            "${{ needs.read-config.outputs.height }}"
+            "--targets"
+            "${{ matrix.arch }}"
+          )
+
+          # Add optional parameters
+          if ("${{ needs.read-config.outputs.debug }}" -eq "true") { $cmd += "--debug" }
+          if ("${{ needs.read-config.outputs.hide_title_bar }}" -eq "true") { $cmd += "--hide-title-bar" }
+          if ("${{ needs.read-config.outputs.fullscreen }}" -eq "true") { $cmd += "--fullscreen" }
+          if ("${{ needs.read-config.outputs.always_on_top }}" -eq "true") { $cmd += "--always-on-top" }
+          if ("${{ needs.read-config.outputs.proxy_url }}" -ne "") {
+            $cmd += "--proxy-url"
+            $cmd += "${{ needs.read-config.outputs.proxy_url }}"
+          }
+          if ("${{ needs.read-config.outputs.user_agent }}" -ne "") {
+            $cmd += "--user-agent"
+            $cmd += "${{ needs.read-config.outputs.user_agent }}"
+          }
+
+          Write-Host "Command: node $($cmd -join ' ')"
+          node @cmd
 
       - name: Find and rename MSI
         shell: pwsh

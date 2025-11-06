@@ -66,10 +66,45 @@ ICON=$(jq -r '.icon' "$CONFIG_PATH")
 WIDTH=$(jq -r '.width' "$CONFIG_PATH")
 HEIGHT=$(jq -r '.height' "$CONFIG_PATH")
 
-echo "  Name:   $NAME"
-echo "  URL:    $URL"
-echo "  Icon:   $ICON"
-echo "  Size:   ${WIDTH}x${HEIGHT}"
+# 读取 options (所有参数)
+TITLE=$(jq -r '.options.title // ""' "$CONFIG_PATH")
+RESIZABLE=$(jq -r '.options.resizable // true' "$CONFIG_PATH")
+FULLSCREEN=$(jq -r '.options.fullscreen // false' "$CONFIG_PATH")
+MAXIMIZE=$(jq -r '.options.maximize // false' "$CONFIG_PATH")
+HIDE_TITLE_BAR=$(jq -r '.options.hideTitleBar // false' "$CONFIG_PATH")
+ALWAYS_ON_TOP=$(jq -r '.options.alwaysOnTop // false' "$CONFIG_PATH")
+APP_VERSION=$(jq -r '.options.appVersion // "1.0.0"' "$CONFIG_PATH")
+DARK_MODE=$(jq -r '.options.darkMode // false' "$CONFIG_PATH")
+DISABLED_WEB_SHORTCUTS=$(jq -r '.options.disabledWebShortcuts // false' "$CONFIG_PATH")
+ACTIVATION_SHORTCUT=$(jq -r '.options.activationShortcut // ""' "$CONFIG_PATH")
+USER_AGENT=$(jq -r '.options.userAgent // ""' "$CONFIG_PATH")
+SHOW_SYSTEM_TRAY=$(jq -r '.options.showSystemTray // false' "$CONFIG_PATH")
+SYSTEM_TRAY_ICON=$(jq -r '.options.systemTrayIcon // ""' "$CONFIG_PATH")
+USE_LOCAL_FILE=$(jq -r '.options.useLocalFile // false' "$CONFIG_PATH")
+MULTI_ARCH=$(jq -r '.options.multiArch // false' "$CONFIG_PATH")
+DEBUG=$(jq -r '.options.debug // false' "$CONFIG_PATH")
+INJECT=$(jq -r '.options.inject // [] | join(",")' "$CONFIG_PATH")
+PROXY_URL=$(jq -r '.options.proxyUrl // ""' "$CONFIG_PATH")
+INSTALLER_LANGUAGE=$(jq -r '.options.installerLanguage // "en-US"' "$CONFIG_PATH")
+HIDE_ON_CLOSE=$(jq -r '.options.hideOnClose // false' "$CONFIG_PATH")
+INCOGNITO=$(jq -r '.options.incognito // false' "$CONFIG_PATH")
+WASM=$(jq -r '.options.wasm // false' "$CONFIG_PATH")
+ENABLE_DRAG_DROP=$(jq -r '.options.enableDragDrop // false' "$CONFIG_PATH")
+KEEP_BINARY=$(jq -r '.options.keepBinary // false' "$CONFIG_PATH")
+MULTI_INSTANCE=$(jq -r '.options.multiInstance // false' "$CONFIG_PATH")
+START_TO_TRAY=$(jq -r '.options.startToTray // false' "$CONFIG_PATH")
+
+echo "  Name:     $NAME"
+echo "  URL:      $URL"
+echo "  Icon:     $ICON"
+echo "  Size:     ${WIDTH}x${HEIGHT}"
+[ "$TITLE" != "" ] && echo "  Title:    $TITLE"
+[ "$DEBUG" = "true" ] && echo "  Debug:    ${YELLOW}Enabled${NC}"
+[ "$PROXY_URL" != "" ] && echo "  Proxy:    $PROXY_URL"
+[ "$USER_AGENT" != "" ] && echo "  UA:       ${USER_AGENT:0:50}..."
+[ "$HIDE_TITLE_BAR" = "true" ] && echo "  TitleBar: ${YELLOW}Hidden${NC}"
+[ "$SHOW_SYSTEM_TRAY" = "true" ] && echo "  Tray:     ${YELLOW}Enabled${NC}"
+[ "$INJECT" != "" ] && echo "  Inject:   $INJECT"
 echo ""
 
 # 检查图标文件
@@ -156,21 +191,53 @@ esac
 echo -e "${BLUE}🚀 Building for $PLATFORM_NAME (target: $TARGET)...${NC}"
 echo ""
 
+# 构建 CLI 参数数组
+CLI_ARGS=(
+  "$URL"
+  --name "$NAME"
+  --icon "$ICON"
+  --width "$WIDTH"
+  --height "$HEIGHT"
+  --targets "$TARGET"
+)
+
+# 添加所有可选参数
+[ "$TITLE" != "" ] && CLI_ARGS+=(--title "$TITLE")
+[ "$RESIZABLE" = "false" ] && CLI_ARGS+=(--no-resizable)
+[ "$FULLSCREEN" = "true" ] && CLI_ARGS+=(--fullscreen)
+[ "$MAXIMIZE" = "true" ] && CLI_ARGS+=(--maximize)
+[ "$HIDE_TITLE_BAR" = "true" ] && CLI_ARGS+=(--hide-title-bar)
+[ "$ALWAYS_ON_TOP" = "true" ] && CLI_ARGS+=(--always-on-top)
+[ "$APP_VERSION" != "1.0.0" ] && CLI_ARGS+=(--app-version "$APP_VERSION")
+[ "$DARK_MODE" = "true" ] && CLI_ARGS+=(--dark-mode)
+[ "$DISABLED_WEB_SHORTCUTS" = "true" ] && CLI_ARGS+=(--disabled-web-shortcuts)
+[ "$ACTIVATION_SHORTCUT" != "" ] && CLI_ARGS+=(--activation-shortcut "$ACTIVATION_SHORTCUT")
+[ "$USER_AGENT" != "" ] && CLI_ARGS+=(--user-agent "$USER_AGENT")
+[ "$SHOW_SYSTEM_TRAY" = "true" ] && CLI_ARGS+=(--show-system-tray)
+[ "$SYSTEM_TRAY_ICON" != "" ] && CLI_ARGS+=(--system-tray-icon "$SYSTEM_TRAY_ICON")
+[ "$USE_LOCAL_FILE" = "true" ] && CLI_ARGS+=(--use-local-file)
+[ "$MULTI_ARCH" = "true" ] && CLI_ARGS+=(--multi-arch)
+[ "$DEBUG" = "true" ] && CLI_ARGS+=(--debug)
+[ "$INJECT" != "" ] && CLI_ARGS+=(--inject "$INJECT")
+[ "$PROXY_URL" != "" ] && CLI_ARGS+=(--proxy-url "$PROXY_URL")
+[ "$INSTALLER_LANGUAGE" != "en-US" ] && CLI_ARGS+=(--installer-language "$INSTALLER_LANGUAGE")
+[ "$HIDE_ON_CLOSE" = "true" ] && CLI_ARGS+=(--hide-on-close)
+[ "$INCOGNITO" = "true" ] && CLI_ARGS+=(--incognito)
+[ "$WASM" = "true" ] && CLI_ARGS+=(--wasm)
+[ "$ENABLE_DRAG_DROP" = "true" ] && CLI_ARGS+=(--enable-drag-drop)
+[ "$KEEP_BINARY" = "true" ] && CLI_ARGS+=(--keep-binary)
+[ "$MULTI_INSTANCE" = "true" ] && CLI_ARGS+=(--multi-instance)
+[ "$START_TO_TRAY" = "true" ] && CLI_ARGS+=(--start-to-tray)
+
+echo "Build command:"
+echo "  node dist/cli.js ${CLI_ARGS[@]}"
+echo ""
+
 # 构建应用
 if [ "$PLATFORM" = "Darwin" ]; then
-  PAKE_CREATE_APP=1 node dist/cli.js "$URL" \
-    --name "$NAME" \
-    --icon "$ICON" \
-    --width "$WIDTH" \
-    --height "$HEIGHT" \
-    --targets "$TARGET"
+  PAKE_CREATE_APP=1 node dist/cli.js "${CLI_ARGS[@]}"
 else
-  node dist/cli.js "$URL" \
-    --name "$NAME" \
-    --icon "$ICON" \
-    --width "$WIDTH" \
-    --height "$HEIGHT" \
-    --targets "$TARGET"
+  node dist/cli.js "${CLI_ARGS[@]}"
 fi
 
 # 检查构建结果

@@ -1,5 +1,5 @@
 {
-  "name": "kpi_drojian",
+  "name": "kpi-drojian",
   "url": "https://kpi.drojian.dev/",
   "icon": "./imgs/kpi_drojian.jpg",
   "width": 1920,
@@ -7,7 +7,7 @@
   "platforms": {
     "macos": {
       "enabled": true,
-      "targets": ["universal", "apple", "intel"]
+      "targets": ["apple"]
     },
     "windows": {
       "enabled": false,

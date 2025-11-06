@@ -1,6 +1,11 @@
 # Build Configurations
 
+# 快速测试 kpi_drojian
+cd /Users/admin/go/rust/Pake
+./scripts/local_build.sh kpi_drojian.json
 
+# 构建完成后运行
+open kpi_drojian.app  # macOS
 🚀 使用方法（推荐）
 
 完整流程
@@ -42,6 +47,21 @@ git tag myapp-v2.0.0 -m "Release myapp"
 git push origin myapp-v2.0.0
 # → 只会读取 build-configs/myapp.json
 
+重新发布步骤
+
+# 1. 删除失败的 tag
+git tag -d kpi_drojian-v0.0.1
+git push origin :refs/tags/kpi_drojian-v0.0.1
+
+# 2. 手动删除 GitHub Release
+# 访问：https://github.com/Xuzan9396/Pake/releases/tag/kpi_drojian-v0.0.1
+# 点击 "Delete" 删除
+
+# 3. 重新创建 tag
+git tag kpi_drojian-v0.0.1 -m "Release kpi_drojian v0.0.1"
+
+# 4. 推送 tag
+git push origin kpi_drojian-v0.0.1
 
 git tag kpi_drojian-v0.0.1 -m "Release kpi_drojian v0.0.1"
 git push origin kpi_drojian-v0.0.1
