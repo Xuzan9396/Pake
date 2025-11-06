@@ -1,5 +1,48 @@
 # Build Configurations
 
+
+🚀 使用方法（推荐）
+
+完整流程
+
+# 1. 确认配置文件存在
+cat build-configs/vinted.json
+
+# 2. 修改代码
+vim src-tauri/src/inject/event.js
+
+# 3. 提交代码
+git add .
+git commit -m "fix: 修复导出功能"
+git push origin main
+
+# 4. 创建并推送 tag
+git tag vinted-v0.0.2 -m "Release vinted v0.0.2"
+git push origin vinted-v0.0.2
+# 5. 查看构建
+# 访问：https://github.com/Xuzan9396/Pake/actions
+
+# 6. 下载安装包
+# 访问：https://github.com/Xuzan9396/Pake/releases/tag/vinted-v0.0.2
+
+
+
+# 打包 vinted
+git tag vinted-v0.0.3 -m "Release vinted"
+git push origin vinted-v0.0.3
+# → 只会读取 build-configs/vinted.json
+
+# 打包 example
+git tag example-v1.0.0 -m "Release example"
+git push origin example-v1.0.0
+# → 只会读取 build-configs/example.json
+
+# 打包其他应用
+git tag myapp-v2.0.0 -m "Release myapp"
+git push origin myapp-v2.0.0
+# → 只会读取 build-configs/myapp.json
+
+
 This directory contains build configuration files for packaging different applications with Pake.
 
 ## Configuration File Format

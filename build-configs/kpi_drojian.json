@@ -1,0 +1,28 @@
+{
+  "name": "kpi_drojian",
+  "url": "https://kpi.drojian.dev/report/report-daily/my-list",
+  "icon": "./imgs/kpi_drojian",
+  "width": 1920,
+  "height": 1080,
+  "platforms": {
+    "macos": {
+      "enabled": true,
+      "targets": ["universal"]
+    },
+    "windows": {
+      "enabled": true,
+      "targets": ["x64", "arm64"]
+    },
+    "linux": {
+      "enabled": false,
+      "targets": ["deb", "appimage"]
+    }
+  },
+  "options": {
+    "fullscreen": false,
+    "resizable": true,
+    "transparent": false,
+    "alwaysOnTop": false,
+    "hideTitleBar": false
+  }
+}
