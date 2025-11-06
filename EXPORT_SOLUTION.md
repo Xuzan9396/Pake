@@ -3,6 +3,7 @@
 ## 问题描述
 
 在 Tauri 2.0 应用中，使用 `window.location.href` 跳转到导出 URL 时：
+
 - ❌ CSV 数据直接在页面显示而不是下载
 - ❌ 沙盒限制导致 JavaScript 拦截器无法执行
 - ❌ Content-Disposition attachment 响应头被忽略
@@ -29,9 +30,9 @@ const DOWNLOAD_PATH_PATTERNS = [
   "/assets/",
   "/releases/",
   "/dist/",
-  "/cookies/export",          // 新增
+  "/cookies/export", // 新增
   "/cookies/download-template", // 新增
-  "/export",                   // 新增
+  "/export", // 新增
 ];
 ```
 
@@ -40,6 +41,7 @@ const DOWNLOAD_PATH_PATTERNS = [
 ### 删除的修改
 
 已删除以下不需要的代码（因为采用了后端解决方案）：
+
 - ❌ 立即执行的页面拦截器
 - ❌ window.location 拦截器
 - ❌ fetch API 拦截器
@@ -58,6 +60,7 @@ const DOWNLOAD_PATH_PATTERNS = [
 ### 主要改动
 
 1. **添加导入**（第 6 行）：
+
 ```go
 import (
     // ...
@@ -69,6 +72,7 @@ import (
 2. **修改 handleExport 函数**：
 
 #### 旧实现（直接返回 CSV）：
+
 ```go
 // 设置响应头
 c.Header("Content-Type", "text/csv; charset=utf-8")
@@ -81,6 +85,7 @@ writer := csv.NewWriter(c.Writer)
 ```
 
 #### 新实现（返回 HTML 页面）：
+
 ```go
 // 1. 生成 CSV 数据到内存 buffer
 var buf bytes.Buffer
@@ -107,6 +112,7 @@ c.String(http.StatusOK, html)
    - 提供"返回"按钮
 
 2. **自动检测环境**：
+
    ```javascript
    if (window.__TAURI__) {
        // Tauri 环境：使用 invoke 命令
@@ -169,20 +175,24 @@ open /Users/admin/go/rust/Pake/vinted.app
 ## 四、优势
 
 ### ✅ 兼容性好
+
 - 同时支持 Tauri 应用和普通浏览器
 - 前端代码无需修改（保持 `window.location.href`）
 
 ### ✅ 用户体验好
+
 - 显示友好的下载提示
 - 自动返回上一页
 - 错误提示清晰
 
 ### ✅ 实现简单
+
 - 只需修改后端一个函数
 - 不需要复杂的前端拦截逻辑
 - 不需要修改 Tauri 配置
 
 ### ✅ 安全性
+
 - 不需要禁用 CSP 或沙盒
 - 使用 Tauri 官方的下载命令
 - Base64 编码确保数据安全传输
@@ -208,6 +218,7 @@ open /Users/admin/go/rust/Pake/vinted.app
 ### 普通浏览器测试
 
 在普通浏览器（Chrome/Safari）中访问：
+
 ```
 http://45.77.62.32:8989/cookies/export
 ```

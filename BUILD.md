@@ -3,11 +3,13 @@
 ## 环境准备
 
 1. 确保已安装依赖：
+
 ```bash
 pnpm i
 ```
 
 2. 构建 CLI 工具：
+
 ```bash
 pnpm run cli:build
 ```
@@ -15,6 +17,7 @@ pnpm run cli:build
 ## 打包小红书示例
 
 ### 基础稳定版（推荐）
+
 仅打包当前系统架构（macOS ARM64）：
 
 ```bash
@@ -23,16 +26,16 @@ node dist/cli.js http://45.77.62.32:8989/ \
   --icon /Users/admin/go/rust/Pake/111.jpg \
   --width 1920 --height 1080 \
   --targets apple
-  
-  
+
+
   node dist/cli.js http://45.77.62.32:8989/ \
   --name vinted-debug \
   --icon /Users/admin/go/rust/Pake/111.jpg \
   --width 1920 --height 1080 \
   --targets apple \
   --debug
-  
-  
+
+
   node dist/cli.js http://127.0.0.1:8989/ \
   --name vinted-debug \
   --icon /Users/admin/go/rust/Pake/111.jpg \
@@ -42,6 +45,7 @@ node dist/cli.js http://45.77.62.32:8989/ \
 ```
 
 **输出位置**：
+
 - `.app` 文件：`src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小红书.app`
 
 ### 常用参数组合
@@ -69,6 +73,7 @@ node dist/cli.js https://www.xiaohongshu.com/ \
 ## 可用参数清单
 
 ### 窗口设置
+
 - `--name` - 应用名称
 - `--icon` - 自定义图标路径（支持 jpg/png/ico/icns）
 - `--width` - 窗口宽度（默认 1200）
@@ -80,18 +85,21 @@ node dist/cli.js https://www.xiaohongshu.com/ \
 - `--always-on-top` - 窗口始终置顶
 
 ### 平台和架构
+
 - `--targets apple` - macOS Apple Silicon（M1/M2/M3）
 - `--targets intel` - macOS Intel
 - `--targets universal` - macOS 通用版（同时支持两种架构）
 - `--multi-arch` - 等同于 universal（旧参数）
 
 ### 系统托盘
+
 - `--show-system-tray` - 显示系统托盘图标
 - `--system-tray-icon` - 自定义托盘图标
 - `--hide-on-close` - 关闭时隐藏而非退出（macOS 默认开启）
 - `--start-to-tray` - 启动时直接最小化到托盘（需配合 --show-system-tray）
 
 ### 功能开关
+
 - `--debug` - 开启开发者工具和调试模式
 - `--incognito` - 隐私模式（不保存 cookies 和历史）
 - `--wasm` - 启用 WebAssembly 支持
@@ -100,6 +108,7 @@ node dist/cli.js https://www.xiaohongshu.com/ \
 - `--disabled-web-shortcuts` - 禁用网页快捷键
 
 ### 高级选项
+
 - `--user-agent` - 自定义 User Agent
 - `--activation-shortcut` - 全局激活快捷键（如 `CmdOrControl+Shift+P`）
 - `--app-version` - 应用版本号（默认 1.0.0）
@@ -173,9 +182,9 @@ const DOWNLOAD_PATH_PATTERNS = [
   "/assets/",
   "/releases/",
   "/dist/",
-  "/cookies/export",          // 导出 cookies
+  "/cookies/export", // 导出 cookies
   "/cookies/download-template", // 下载模板
-  "/export",                   // 通用导出路径
+  "/export", // 通用导出路径
 ];
 ```
 
@@ -231,6 +240,7 @@ node dist/cli.js YOUR_URL \
 **测试方法**：
 
 1. 打包调试版本查看详细日志：
+
 ```bash
 PAKE_CREATE_APP=1 node dist/cli.js http://45.77.62.32:8989/ \
   --name vinted-debug \
