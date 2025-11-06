@@ -48,8 +48,8 @@ pub fn set_system_tray(
             }
             _ => (),
         })
-        .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::Click { button, .. } => {
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button, .. } = event {
                 if button == tauri::tray::MouseButton::Left {
                     if let Some(window) = tray.app_handle().get_webview_window("pake") {
                         let is_visible = window.is_visible().unwrap_or(false);
@@ -62,7 +62,6 @@ pub fn set_system_tray(
                     }
                 }
             }
-            _ => {}
         })
         .icon(if tray_icon_path.is_empty() {
             app.default_window_icon()
