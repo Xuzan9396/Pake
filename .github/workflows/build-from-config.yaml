@@ -1,0 +1,380 @@
+name: Build from Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      config:
+        description: 'Config file to build (e.g., vinted, example)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.15.0'
+
+jobs:
+  prepare:
+    name: Read Build Configurations
+    runs-on: ubuntu-latest
+    outputs:
+      configs: ${{ steps.get-configs.outputs.configs }}
+      single_config: ${{ steps.get-configs.outputs.single_config }}
+      build_mode: ${{ steps.get-configs.outputs.build_mode }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get configurations
+        id: get-configs
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Manual trigger: build single config
+            CONFIG="${{ inputs.config }}"
+            echo "Building single config: $CONFIG"
+            echo "build_mode=single" >> $GITHUB_OUTPUT
+            echo "single_config=$CONFIG" >> $GITHUB_OUTPUT
+
+            # Read the config file
+            CONFIG_FILE="build-configs/${CONFIG}.json"
+            if [ ! -f "$CONFIG_FILE" ]; then
+              echo "Error: Config file not found: $CONFIG_FILE"
+              exit 1
+            fi
+
+            echo "configs=[\"$CONFIG\"]" >> $GITHUB_OUTPUT
+          else
+            # Tag trigger: build all configs
+            echo "Building all configs"
+            echo "build_mode=all" >> $GITHUB_OUTPUT
+
+            # Get all config files
+            CONFIGS=$(ls build-configs/*.json | xargs -n 1 basename | sed 's/.json$//' | jq -R -s -c 'split("\n")[:-1]')
+            echo "configs=$CONFIGS" >> $GITHUB_OUTPUT
+          fi
+
+  build-macos:
+    name: Build macOS - ${{ matrix.config }}
+    needs: prepare
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJSON(needs.prepare.outputs.configs) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read config
+        id: read-config
+        run: |
+          CONFIG_FILE="build-configs/${{ matrix.config }}.json"
+
+          # Check if macOS is enabled
+          MACOS_ENABLED=$(jq -r '.platforms.macos.enabled' "$CONFIG_FILE")
+          if [ "$MACOS_ENABLED" != "true" ]; then
+            echo "macOS build disabled for ${{ matrix.config }}"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+          # Extract config values
+          echo "name=$(jq -r '.name' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "url=$(jq -r '.url' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "icon=$(jq -r '.icon' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "width=$(jq -r '.width' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "height=$(jq -r '.height' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+
+          # Get targets
+          TARGETS=$(jq -r '.platforms.macos.targets[]' $CONFIG_FILE | tr '\n' ',' | sed 's/,$//')
+          echo "targets=$TARGETS" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        if: steps.read-config.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        if: steps.read-config.outputs.skip != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        if: steps.read-config.outputs.skip != 'true'
+        run: pnpm install
+
+      - name: Build CLI
+        if: steps.read-config.outputs.skip != 'true'
+        run: pnpm run cli:build
+
+      - name: Build macOS App
+        if: steps.read-config.outputs.skip != 'true'
+        env:
+          PAKE_CREATE_APP: 1
+        run: |
+          node dist/cli.js ${{ steps.read-config.outputs.url }} \
+            --name ${{ steps.read-config.outputs.name }} \
+            --icon ${{ steps.read-config.outputs.icon }} \
+            --width ${{ steps.read-config.outputs.width }} \
+            --height ${{ steps.read-config.outputs.height }} \
+            --targets universal
+
+      - name: Package DMG
+        if: steps.read-config.outputs.skip != 'true'
+        run: |
+          APP_PATH=$(find . -name "${{ steps.read-config.outputs.name }}.app" -type d | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: App not found"
+            exit 1
+          fi
+
+          mkdir -p output
+          DMG_NAME="${{ steps.read-config.outputs.name }}_${{ github.ref_name }}_macos_universal.dmg"
+
+          mkdir -p dmg_temp
+          cp -R "$APP_PATH" dmg_temp/
+
+          hdiutil create -volname "${{ steps.read-config.outputs.name }}" -srcfolder dmg_temp -ov -format UDZO "output/$DMG_NAME"
+
+          rm -rf dmg_temp
+
+          echo "DMG created: output/$DMG_NAME"
+          ls -lh output/
+
+      - name: Upload macOS artifacts
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config }}-macos-universal
+          path: output/*.dmg
+          retention-days: 3
+
+  build-windows:
+    name: Build Windows ${{ matrix.arch }} - ${{ matrix.config }}
+    needs: prepare
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJSON(needs.prepare.outputs.configs) }}
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read config
+        id: read-config
+        shell: bash
+        run: |
+          CONFIG_FILE="build-configs/${{ matrix.config }}.json"
+
+          # Check if Windows is enabled
+          WINDOWS_ENABLED=$(jq -r '.platforms.windows.enabled' "$CONFIG_FILE")
+          if [ "$WINDOWS_ENABLED" != "true" ]; then
+            echo "Windows build disabled for ${{ matrix.config }}"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check if this arch is in targets
+          TARGETS=$(jq -r '.platforms.windows.targets[]' "$CONFIG_FILE")
+          if ! echo "$TARGETS" | grep -q "${{ matrix.arch }}"; then
+            echo "Arch ${{ matrix.arch }} not in targets for ${{ matrix.config }}"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+          # Extract config values
+          echo "name=$(jq -r '.name' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "url=$(jq -r '.url' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "icon=$(jq -r '.icon' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "width=$(jq -r '.width' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "height=$(jq -r '.height' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        if: steps.read-config.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        if: steps.read-config.outputs.skip != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-msvc
+          targets: ${{ matrix.arch == 'x64' && 'x86_64-pc-windows-msvc' || 'aarch64-pc-windows-msvc' }}
+
+      - name: Rust cache
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-cargo-
+
+      - name: Install dependencies
+        if: steps.read-config.outputs.skip != 'true'
+        run: pnpm install
+
+      - name: Build CLI
+        if: steps.read-config.outputs.skip != 'true'
+        run: pnpm run cli:build
+
+      - name: Build Windows ${{ matrix.arch }} App
+        if: steps.read-config.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "Building Windows ${{ matrix.arch }} app..."
+          node dist/cli.js ${{ steps.read-config.outputs.url }} `
+            --name ${{ steps.read-config.outputs.name }} `
+            --icon ${{ steps.read-config.outputs.icon }} `
+            --width ${{ steps.read-config.outputs.width }} `
+            --height ${{ steps.read-config.outputs.height }} `
+            --targets ${{ matrix.arch }}
+
+      - name: Find and rename MSI
+        if: steps.read-config.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          $msiPath = "${{ steps.read-config.outputs.name }}.msi"
+
+          Write-Host "Looking for MSI: $msiPath"
+
+          if (-not (Test-Path $msiPath)) {
+            Write-Host "MSI not found in project root, searching..."
+            Get-ChildItem -Path . -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "Found MSI: $($_.FullName)"
+            }
+            Write-Error "MSI file not found: $msiPath"
+            exit 1
+          }
+
+          Write-Host "Found MSI: $msiPath"
+
+          New-Item -Path "output" -ItemType Directory -Force
+
+          $newName = "${{ steps.read-config.outputs.name }}_${{ github.ref_name }}_windows_${{ matrix.arch }}.msi"
+          Copy-Item -Path $msiPath -Destination "output\$newName"
+
+          Write-Host "MSI created: output\$newName"
+          Get-ChildItem -Path "output"
+
+      - name: Upload Windows ${{ matrix.arch }} artifacts
+        if: steps.read-config.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config }}-windows-${{ matrix.arch }}
+          path: output/*.msi
+          retention-days: 3
+
+  create-release:
+    name: Create Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: |
+          echo "Artifacts structure:"
+          ls -R artifacts/
+
+      - name: Generate release body
+        id: release-body
+        run: |
+          cat > release_body.md << 'EOF'
+          ## Desktop Applications ${{ github.ref_name }}
+
+          ### Downloads
+
+          EOF
+
+          # List all artifacts
+          for dir in artifacts/*/; do
+            if [ -d "$dir" ]; then
+              echo "#### $(basename "$dir")" >> release_body.md
+              ls "$dir" | while read file; do
+                echo "- \`$file\`" >> release_body.md
+              done
+              echo "" >> release_body.md
+            fi
+          done
+
+          cat >> release_body.md << 'EOF'
+
+          ### Installation
+
+          **macOS**: Download the DMG file, open it, and drag the app to Applications folder.
+
+          **Windows**: Download the MSI file for your architecture and run it.
+
+          ---
+
+          Built with [Pake](https://github.com/tw93/Pake)
+          EOF
+
+          cat release_body.md
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          bodyFile: release_body.md
+          artifacts: "artifacts/**/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          allowUpdates: true
