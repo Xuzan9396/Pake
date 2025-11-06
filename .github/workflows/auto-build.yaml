@@ -1,0 +1,310 @@
+name: Auto Build from Commit
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.15.0'
+
+jobs:
+  detect-config:
+    name: Detect Build Config
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      config_name: ${{ steps.check.outputs.config_name }}
+      config_exists: ${{ steps.check.outputs.config_exists }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check commit message for build trigger
+        id: check
+        run: |
+          # Get commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Check if commit message contains #配置名# pattern
+          if echo "$COMMIT_MSG" | grep -qE '#[a-zA-Z0-9_-]+#'; then
+            # Extract config name between ## markers
+            CONFIG_NAME=$(echo "$COMMIT_MSG" | grep -oE '#[a-zA-Z0-9_-]+#' | head -1 | sed 's/#//g')
+            echo "Found build trigger for config: $CONFIG_NAME"
+
+            # Check if config file exists
+            CONFIG_FILE="build-configs/${CONFIG_NAME}.json"
+            if [ -f "$CONFIG_FILE" ]; then
+              echo "Config file found: $CONFIG_FILE"
+              echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "config_name=$CONFIG_NAME" >> $GITHUB_OUTPUT
+              echo "config_exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "Config file not found: $CONFIG_FILE"
+              echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "config_exists=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No build trigger found in commit message"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  read-config:
+    name: Read Build Configuration
+    needs: detect-config
+    if: needs.detect-config.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.read.outputs.name }}
+      url: ${{ steps.read.outputs.url }}
+      icon: ${{ steps.read.outputs.icon }}
+      width: ${{ steps.read.outputs.width }}
+      height: ${{ steps.read.outputs.height }}
+      macos_enabled: ${{ steps.read.outputs.macos_enabled }}
+      windows_enabled: ${{ steps.read.outputs.windows_enabled }}
+      windows_targets: ${{ steps.read.outputs.windows_targets }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read configuration
+        id: read
+        run: |
+          CONFIG_FILE="build-configs/${{ needs.detect-config.outputs.config_name }}.json"
+
+          echo "Reading config: $CONFIG_FILE"
+          cat "$CONFIG_FILE"
+
+          # Extract values
+          echo "name=$(jq -r '.name' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "url=$(jq -r '.url' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "icon=$(jq -r '.icon' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "width=$(jq -r '.width' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "height=$(jq -r '.height' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+
+          # Check platform enables
+          echo "macos_enabled=$(jq -r '.platforms.macos.enabled' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+          echo "windows_enabled=$(jq -r '.platforms.windows.enabled' $CONFIG_FILE)" >> $GITHUB_OUTPUT
+
+          # Get Windows targets as JSON array
+          WINDOWS_TARGETS=$(jq -c '.platforms.windows.targets' $CONFIG_FILE)
+          echo "windows_targets=$WINDOWS_TARGETS" >> $GITHUB_OUTPUT
+
+          echo "Configuration loaded successfully"
+
+  build-macos:
+    name: Build macOS Universal
+    needs: [detect-config, read-config]
+    if: needs.read-config.outputs.macos_enabled == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build CLI
+        run: pnpm run cli:build
+
+      - name: Build macOS Universal App
+        env:
+          PAKE_CREATE_APP: 1
+        run: |
+          echo "Building macOS app with config:"
+          echo "  Name: ${{ needs.read-config.outputs.name }}"
+          echo "  URL: ${{ needs.read-config.outputs.url }}"
+          echo "  Icon: ${{ needs.read-config.outputs.icon }}"
+          echo "  Size: ${{ needs.read-config.outputs.width }}x${{ needs.read-config.outputs.height }}"
+
+          node dist/cli.js ${{ needs.read-config.outputs.url }} \
+            --name ${{ needs.read-config.outputs.name }} \
+            --icon ${{ needs.read-config.outputs.icon }} \
+            --width ${{ needs.read-config.outputs.width }} \
+            --height ${{ needs.read-config.outputs.height }} \
+            --targets universal
+
+      - name: Package DMG
+        run: |
+          APP_PATH=$(find . -name "${{ needs.read-config.outputs.name }}.app" -type d | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: App not found"
+            exit 1
+          fi
+
+          mkdir -p output
+          DMG_NAME="${{ needs.read-config.outputs.name }}_$(date +%Y%m%d_%H%M%S)_macos_universal.dmg"
+
+          mkdir -p dmg_temp
+          cp -R "$APP_PATH" dmg_temp/
+
+          hdiutil create -volname "${{ needs.read-config.outputs.name }}" -srcfolder dmg_temp -ov -format UDZO "output/$DMG_NAME"
+
+          rm -rf dmg_temp
+
+          echo "DMG created: output/$DMG_NAME"
+          ls -lh output/
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.detect-config.outputs.config_name }}-macos-universal
+          path: output/*.dmg
+          retention-days: 7
+
+  build-windows:
+    name: Build Windows ${{ matrix.arch }}
+    needs: [detect-config, read-config]
+    if: needs.read-config.outputs.windows_enabled == 'true'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.read-config.outputs.windows_targets) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-msvc
+          targets: ${{ matrix.arch == 'x64' && 'x86_64-pc-windows-msvc' || 'aarch64-pc-windows-msvc' }}
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-cargo-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build CLI
+        run: pnpm run cli:build
+
+      - name: Build Windows ${{ matrix.arch }} App
+        shell: pwsh
+        run: |
+          Write-Host "Building Windows ${{ matrix.arch }} app with config:"
+          Write-Host "  Name: ${{ needs.read-config.outputs.name }}"
+          Write-Host "  URL: ${{ needs.read-config.outputs.url }}"
+          Write-Host "  Icon: ${{ needs.read-config.outputs.icon }}"
+          Write-Host "  Size: ${{ needs.read-config.outputs.width }}x${{ needs.read-config.outputs.height }}"
+
+          node dist/cli.js ${{ needs.read-config.outputs.url }} `
+            --name ${{ needs.read-config.outputs.name }} `
+            --icon ${{ needs.read-config.outputs.icon }} `
+            --width ${{ needs.read-config.outputs.width }} `
+            --height ${{ needs.read-config.outputs.height }} `
+            --targets ${{ matrix.arch }}
+
+      - name: Find and rename MSI
+        shell: pwsh
+        run: |
+          $msiPath = "${{ needs.read-config.outputs.name }}.msi"
+
+          Write-Host "Looking for MSI: $msiPath"
+
+          if (-not (Test-Path $msiPath)) {
+            Write-Host "MSI not found in project root, searching..."
+            Get-ChildItem -Path . -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "Found MSI: $($_.FullName)"
+            }
+            Write-Error "MSI file not found: $msiPath"
+            exit 1
+          }
+
+          Write-Host "Found MSI: $msiPath"
+
+          New-Item -Path "output" -ItemType Directory -Force
+
+          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $newName = "${{ needs.read-config.outputs.name }}_${timestamp}_windows_${{ matrix.arch }}.msi"
+          Copy-Item -Path $msiPath -Destination "output\$newName"
+
+          Write-Host "MSI created: output\$newName"
+          Get-ChildItem -Path "output"
+
+      - name: Upload Windows ${{ matrix.arch }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.detect-config.outputs.config_name }}-windows-${{ matrix.arch }}
+          path: output/*.msi
+          retention-days: 7
+
+  summary:
+    name: Build Summary
+    needs: [detect-config, read-config, build-macos, build-windows]
+    if: always() && needs.detect-config.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# 🎉 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Config**: \`${{ needs.detect-config.outputs.config_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**App Name**: \`${{ needs.read-config.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**URL**: \`${{ needs.read-config.outputs.url }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS Universal | ${{ needs.build-macos.result == 'success' && '✅ Success' || needs.build-macos.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows x64 | ${{ needs.build-windows.result == 'success' && '✅ Success' || needs.build-windows.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows ARM64 | ${{ needs.build-windows.result == 'success' && '✅ Success' || needs.build-windows.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts are available in the [Actions artifacts section](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for 7 days." >> $GITHUB_STEP_SUMMARY

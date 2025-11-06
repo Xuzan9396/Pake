@@ -1,0 +1,28 @@
+{
+  "name": "vinted",
+  "url": "http://45.77.62.32:8989/",
+  "icon": "./111.jpg",
+  "width": 1920,
+  "height": 1080,
+  "platforms": {
+    "macos": {
+      "enabled": true,
+      "targets": ["universal"]
+    },
+    "windows": {
+      "enabled": true,
+      "targets": ["x64", "arm64"]
+    },
+    "linux": {
+      "enabled": false,
+      "targets": ["deb", "appimage"]
+    }
+  },
+  "options": {
+    "fullscreen": false,
+    "resizable": true,
+    "transparent": false,
+    "alwaysOnTop": false,
+    "hideTitleBar": false
+  }
+}

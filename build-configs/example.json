@@ -1,0 +1,32 @@
+{
+  "name": "example-app",
+  "url": "https://www.example.com/",
+  "icon": "./icons/example.png",
+  "width": 1200,
+  "height": 800,
+  "platforms": {
+    "macos": {
+      "enabled": true,
+      "targets": ["universal"]
+    },
+    "windows": {
+      "enabled": true,
+      "targets": ["x64"]
+    },
+    "linux": {
+      "enabled": true,
+      "targets": ["deb", "appimage"]
+    }
+  },
+  "options": {
+    "fullscreen": false,
+    "resizable": true,
+    "transparent": false,
+    "alwaysOnTop": false,
+    "hideTitleBar": false,
+    "multiArch": false,
+    "debug": false,
+    "inject": []
+  },
+  "description": "Example application packaged with Pake"
+}
