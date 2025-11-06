@@ -162,48 +162,28 @@ jobs:
       - name: Find and rename MSI
         shell: pwsh
         run: |
-          # Determine target triple
-          $targetTriple = if ("${{ matrix.arch }}" -eq "x64") {
-            "x86_64-pc-windows-msvc"
-          } else {
-            "aarch64-pc-windows-msvc"
-          }
+          # Pake CLI moves the final MSI to project root as <name>.msi
+          $msiPath = "${{ env.APP_NAME }}.msi"
 
-          Write-Host "Looking for MSI in target: $targetTriple"
+          Write-Host "Looking for MSI: $msiPath"
 
-          # Expected MSI path
-          $msiDir = "src-tauri\target\$targetTriple\release\bundle\msi"
-
-          # List directory contents for debugging
-          Write-Host "Checking directory: $msiDir"
-          if (Test-Path $msiDir) {
-            Write-Host "Directory contents:"
-            Get-ChildItem -Path $msiDir
-          } else {
-            Write-Host "MSI directory not found! Searching entire target directory..."
-            Get-ChildItem -Path "src-tauri\target" -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+          if (-not (Test-Path $msiPath)) {
+            Write-Host "MSI not found in project root, searching..."
+            Get-ChildItem -Path . -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
               Write-Host "Found MSI: $($_.FullName)"
             }
-            Write-Error "Expected MSI directory not found: $msiDir"
+            Write-Error "MSI file not found: $msiPath"
             exit 1
           }
 
-          # Find MSI file
-          $msiPath = Get-ChildItem -Path $msiDir -Filter "*.msi" | Select-Object -First 1
-
-          if (-not $msiPath) {
-            Write-Error "MSI file not found in $msiDir"
-            exit 1
-          }
-
-          Write-Host "Found MSI: $($msiPath.FullName)"
+          Write-Host "Found MSI: $msiPath"
 
           # Create output directory
           New-Item -Path "output" -ItemType Directory -Force
 
           # Copy and rename MSI
           $newName = "${{ env.APP_NAME }}_${{ github.ref_name }}_windows_${{ matrix.arch }}.msi"
-          Copy-Item -Path $msiPath.FullName -Destination "output\$newName"
+          Copy-Item -Path $msiPath -Destination "output\$newName"
 
           Write-Host "MSI created: output\$newName"
           Get-ChildItem -Path "output"
