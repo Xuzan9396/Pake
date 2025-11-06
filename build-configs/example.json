@@ -1,9 +1,10 @@
 {
-  "name": "example-app",
+  "name": "example",
   "url": "https://www.example.com/",
   "icon": "./icons/example.png",
   "width": 1200,
   "height": 800,
+
   "platforms": {
     "macos": {
       "enabled": true,
@@ -11,22 +12,40 @@
     },
     "windows": {
       "enabled": true,
-      "targets": ["x64"]
+      "targets": ["x64", "arm64"]
     },
     "linux": {
-      "enabled": true,
+      "enabled": false,
       "targets": ["deb", "appimage"]
     }
   },
+
   "options": {
-    "fullscreen": false,
+    "title": "Example App",
     "resizable": true,
-    "transparent": false,
-    "alwaysOnTop": false,
+    "fullscreen": false,
+    "maximize": false,
     "hideTitleBar": false,
+    "alwaysOnTop": false,
+    "appVersion": "1.0.0",
+    "darkMode": false,
+    "disabledWebShortcuts": false,
+    "activationShortcut": "",
+    "userAgent": "",
+    "showSystemTray": false,
+    "systemTrayIcon": "",
+    "useLocalFile": false,
     "multiArch": false,
     "debug": false,
-    "inject": []
-  },
-  "description": "Example application packaged with Pake"
+    "inject": [],
+    "proxyUrl": "",
+    "installerLanguage": "en-US",
+    "hideOnClose": false,
+    "incognito": false,
+    "wasm": false,
+    "enableDragDrop": false,
+    "keepBinary": false,
+    "multiInstance": false,
+    "startToTray": false
+  }
 }
