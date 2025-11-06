@@ -156,12 +156,20 @@ jobs:
 
       - name: Package DMG
         run: |
-          APP_PATH=$(find . -name "${{ needs.read-config.outputs.name }}.app" -type d | head -n 1)
+          # Find any .app file (excluding node_modules, git, etc.)
+          echo "Searching for .app files..."
+          find . -name "*.app" -type d -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/target/*" || true
+
+          APP_PATH=$(find . -name "*.app" -type d -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/target/*" | head -n 1)
 
           if [ -z "$APP_PATH" ]; then
-            echo "Error: App not found"
+            echo "Error: No .app file found"
+            echo "Searching all directories:"
+            find . -type d -name "*.app" || true
             exit 1
           fi
+
+          echo "Found app: $APP_PATH"
 
           mkdir -p output
           DMG_NAME="${{ needs.read-config.outputs.name }}_v${{ needs.parse-tag.outputs.version }}_macos_universal.dmg"
@@ -246,12 +254,32 @@ jobs:
       - name: Find and rename MSI
         shell: pwsh
         run: |
-          $msiPath = "${{ needs.read-config.outputs.name }}.msi"
+          # Search for any .msi file in project root
+          Write-Host "Searching for MSI files in project root..."
+          $msiFiles = Get-ChildItem -Path . -Filter "*.msi" -File -ErrorAction SilentlyContinue
 
-          if (-not (Test-Path $msiPath)) {
-            Write-Error "MSI file not found: $msiPath"
-            exit 1
+          if ($msiFiles) {
+            Write-Host "Found MSI files in root:"
+            $msiFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+            $msiPath = $msiFiles[0].FullName
+          } else {
+            Write-Host "No MSI in root, searching entire project..."
+            $msiFiles = Get-ChildItem -Path . -Recurse -Filter "*.msi" -File -ErrorAction SilentlyContinue | Where-Object {
+              $_.FullName -notlike "*\node_modules\*" -and
+              $_.FullName -notlike "*\.git\*"
+            }
+
+            if ($msiFiles) {
+              Write-Host "Found MSI files:"
+              $msiFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+              $msiPath = $msiFiles[0].FullName
+            } else {
+              Write-Error "No MSI file found anywhere in the project"
+              exit 1
+            }
           }
+
+          Write-Host "Using MSI: $msiPath"
 
           New-Item -Path "output" -ItemType Directory -Force
 
