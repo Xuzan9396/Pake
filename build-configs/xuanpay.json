@@ -10,7 +10,7 @@
       "targets": ["apple"]
     },
     "windows": {
-      "enabled": false,
+      "enabled": true,
       "targets": ["x64", "arm64"]
     },
     "linux": {
