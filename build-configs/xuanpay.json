@@ -24,6 +24,6 @@
     "transparent": false,
     "alwaysOnTop": false,
     "hideTitleBar": false,
-    "debug": true
+    "debug": false
   }
 }
