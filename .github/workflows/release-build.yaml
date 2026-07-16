@@ -446,7 +446,7 @@ jobs:
           cat release_body.md
 
       - name: Create Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@v1.20.0
         with:
           name: ${{ needs.read-config.outputs.name }} v${{ needs.parse-tag.outputs.version }}
           tag: ${{ github.ref_name }}
