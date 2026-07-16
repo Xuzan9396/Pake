@@ -295,3 +295,4 @@ git push origin xuanpay-v2.0.0
 2. 在 macos-latest 构建 Apple Silicon .app
 3. 用 hdiutil 包装成 DMG
 4. 创建 GitHub Release 并上传 DMG
+5. sudo xattr -rd com.apple.quarantine /Applications/xuanpay.app
