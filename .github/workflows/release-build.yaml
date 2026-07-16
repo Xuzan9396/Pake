@@ -254,8 +254,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable-msvc
+          toolchain: 1.93.0
           targets: ${{ matrix.arch == 'x64' && 'x86_64-pc-windows-msvc' || 'aarch64-pc-windows-msvc' }}
+
+      - name: Verify Rust target
+        shell: pwsh
+        run: |
+          rustup show active-toolchain
+          rustup target list --installed
 
       - name: Rust cache
         uses: actions/cache@v4

@@ -11,7 +11,7 @@
     },
     "windows": {
       "enabled": true,
-      "targets": ["x64", "arm64"]
+      "targets": ["x64"]
     },
     "linux": {
       "enabled": false,
