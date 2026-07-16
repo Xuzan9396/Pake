@@ -35,8 +35,8 @@ source ~/.bashrc
 **Prerequisites:**
 
 - Node.js ≥18.0.0
-- Rust ≥1.78.0 (installed automatically if missing)
-- **Windows/Linux**: See [system dependencies guide](advanced-usage.md#prerequisites) for platform-specific requirements
+- Rust ≥1.85.0 (installed automatically if missing)
+- **macOS/Linux**: `curl`, `wget`, `file` and `tar` used for dependency management
 
 ## Quick Start
 
@@ -60,7 +60,7 @@ pake [url] [options]
 
 The packaged application will be located in the current working directory by default. The first packaging might take some time due to environment configuration. Please be patient.
 
-> **macOS Output**: On macOS, Pake creates DMG installers by default. To create `.app` bundles for testing (to avoid user interaction), set the environment variable `PAKE_CREATE_APP=1`.
+> **macOS Output**: On macOS, Pake creates DMG installers by default. To create `.app` bundles for testing (to avoid user interaction), set the environment variable `PAKE_CREATE_APP=1`. If you want Pake to install the app directly into `/Applications`, use `--install`, which builds an `.app`, copies it into `/Applications`, and removes the local bundle after a successful install.
 >
 > **Note**: Packaging requires the Rust environment. If Rust is not installed, you will be prompted for installation confirmation. In case of installation failure or timeout, you can [install it manually](https://www.rust-lang.org/tools/install).
 
@@ -70,16 +70,19 @@ The URL is the link to the web page you want to package or the path to a local H
 
 ### [options]
 
-Various options are available for customization. Here are the most commonly used ones:
+Various options are available for customization. `pake --help` shows every supported CLI option. This page is the complete reference.
 
-| Option             | Description                                     | Example                                        |
-| ------------------ | ----------------------------------------------- | ---------------------------------------------- |
-| `--name`           | Application name                                | `--name "Weekly"`                              |
-| `--icon`           | Custom icon (optional, auto-fetch website icon) | `--icon https://cdn.tw93.fun/pake/weekly.icns` |
-| `--width`          | Window width (default: 1200px)                  | `--width 1400`                                 |
-| `--height`         | Window height (default: 780px)                  | `--height 900`                                 |
-| `--hide-title-bar` | Immersive header (macOS only)                   | `--hide-title-bar`                             |
-| `--debug`          | Enable development tools                        | `--debug`                                      |
+| Option                      | Description                                         | Example                                        |
+| --------------------------- | --------------------------------------------------- | ---------------------------------------------- |
+| `--name`                    | Application name                                    | `--name "Weekly"`                              |
+| `--icon`                    | Custom icon (optional, auto-fetch website icon)     | `--icon https://cdn.tw93.fun/pake/weekly.icns` |
+| `--width`                   | Window width (default: 1200px)                      | `--width 1400`                                 |
+| `--height`                  | Window height (default: 780px)                      | `--height 900`                                 |
+| `--hide-title-bar`          | Immersive header (macOS only)                       | `--hide-title-bar`                             |
+| `--hide-window-decorations` | Hide native window decorations (Windows/Linux only) | `--hide-window-decorations`                    |
+| `--debug`                   | Enable development tools                            | `--debug`                                      |
+| `--help`                    | Show all CLI options                                | `--help`                                       |
+| `--version`                 | Show CLI version                                    | `--version`                                    |
 
 For complete options, see detailed sections below.
 
@@ -138,12 +141,46 @@ Set the width of the application window. Default is `1200px`.
 --width <number>
 ```
 
+#### [min-width]
+
+Set the minimum width that the window can be resized to. Keeps layouts usable when the window is dragged small.
+
+```shell
+--min-width <number>
+```
+
+#### [min-height]
+
+Set the minimum height that the window can be resized to. Prevents UI breakage caused by very short windows.
+
+```shell
+--min-height <number>
+```
+
+#### [zoom]
+
+Set initial page zoom level as an integer between 50 and 200. Default is `100`. Users can still adjust with `Cmd/Ctrl +/-/0` shortcuts.
+
+```shell
+--zoom <number>
+--zoom 80   # 80%
+--zoom 120  # 120%
+```
+
 #### [hide-title-bar]
 
 Enable or disable immersive header. Default is `false`. Use the following command to enable this feature, macOS only.
 
 ```shell
 --hide-title-bar
+```
+
+#### [hide-window-decorations]
+
+Hide the native window decorations on Windows and Linux. Default is `false`. This removes the title bar and window controls, then adds a top drag region for moving the window. Use `F11` to toggle native fullscreen. Ignored on macOS.
+
+```shell
+--hide-window-decorations
 ```
 
 #### [fullscreen]
@@ -190,11 +227,13 @@ Set the version number of the packaged application to be consistent with the nam
 
 #### [dark-mode]
 
-Force Mac to package applications using dark mode, default is `false`.
+Force packaging applications using dark mode (supports macOS, Windows, and Linux), default is `false`.
 
 ```shell
 --dark-mode
 ```
+
+On Linux this goes through WebKitGTK, so whether a page renders dark also depends on the WebKitGTK build honoring the window theme and the site implementing `prefers-color-scheme: dark`.
 
 #### [disabled-web-shortcuts]
 
@@ -202,6 +241,49 @@ Sets whether to disable web shortcuts in the original Pake container, defaults t
 
 ```shell
 --disabled-web-shortcuts
+```
+
+#### [enable-find]
+
+Enable Pake's in-page Find UI. Default is `false`. When enabled, users can press `Cmd/Ctrl+F` to open Find, `Cmd/Ctrl+G` to jump to the next match, and `Cmd/Ctrl+Shift+G` to jump to the previous match.
+
+```shell
+--enable-find
+```
+
+#### [force-internal-navigation]
+
+Keeps every clicked link (even pointing to other domains) inside the Pake window instead of letting the OS open an external browser or helper. Default is `false`.
+
+```shell
+--force-internal-navigation
+```
+
+#### [internal-url-regex]
+
+Set a regex pattern to determine which URLs should be considered internal (opened within the app). When set, this pattern takes precedence over the default domain-based matching. Useful when you want to limit internal navigation to specific paths on a domain.
+
+```shell
+--internal-url-regex <pattern>
+
+# Example: Only treat facebook.com/messages paths as internal
+--internal-url-regex "^https://www\\.facebook\\.com/messages(/.*)?$"
+
+# Example: Only treat specific subdomains as internal
+--internal-url-regex "^https://(app|api)\\.example\\.com"
+```
+
+#### [safe-domain]
+
+A simpler way to keep trusted domains and their subdomains inside the app. This is useful for workspace callbacks and enterprise SSO flows, for example Slack plus Okta. Pake compiles this list into `internal_url_regex`; if `--internal-url-regex` is also set, the explicit regex wins.
+
+`--safe-domain` matches URL hosts only, not arbitrary path or query text.
+
+```shell
+--safe-domain <domains>
+
+# Keep Slack and Okta auth redirects inside the app
+--safe-domain slack.com,okta.com
 ```
 
 #### [multi-arch]
@@ -233,9 +315,9 @@ Package the application to support both Intel and M1 chips, exclusively for macO
 
 Specify the build target architecture or format:
 
-- **Linux**: `deb`, `appimage`, `deb-arm64`, `appimage-arm64` (default: `deb`)
+- **Linux**: `deb`, `appimage`, `rpm`, `zst`, `deb-arm64`, `appimage-arm64`, `rpm-arm64`, `zst-arm64` (default: distro-aware, `deb, appimage` on Debian/Ubuntu and `rpm, appimage` on Fedora/RHEL/Oracle/Rocky/Alma/openSUSE)
 - **Windows**: `x64`, `arm64` (auto-detects if not specified)
-- **macOS**: `intel`, `apple`, `universal` (auto-detects if not specified)
+- **macOS**: `intel`, `apple`, `universal` (architecture, auto-detects if not specified); `app`, `dmg` (output format, default: `dmg`)
 
 ```shell
 --targets <target>
@@ -246,12 +328,16 @@ Specify the build target architecture or format:
 --targets universal      # macOS Universal (Intel + Apple Silicon)
 --targets apple          # macOS Apple Silicon only
 --targets intel          # macOS Intel only
+--targets app            # macOS app bundle only (.app, skips the DMG step)
+--targets dmg            # macOS DMG installer (default)
 --targets deb            # Linux DEB package (x64)
 --targets rpm            # Linux RPM package (x64)
 --targets appimage       # Linux AppImage (x64)
+--targets zst            # Linux Arch package (x64 .pkg.tar.zst)
 --targets deb-arm64      # Linux DEB package (ARM64)
 --targets rpm-arm64      # Linux RPM package (ARM64)
 --targets appimage-arm64 # Linux AppImage (ARM64)
+--targets zst-arm64      # Linux Arch package (ARM64 .pkg.tar.zst)
 ```
 
 **Note for Linux ARM64**:
@@ -259,6 +345,17 @@ Specify the build target architecture or format:
 - Cross-compilation requires additional setup. Install `gcc-aarch64-linux-gnu` and configure environment variables for cross-compilation.
 - ARM64 support enables Pake apps to run on ARM-based Linux devices, including Linux phones (postmarketOS, Ubuntu Touch), Raspberry Pi, and other ARM64 Linux systems.
 - Use `--target appimage-arm64` for portable ARM64 applications that work across different ARM64 Linux distributions.
+- Use `--targets zst` on Arch Linux based distributions to produce a `.pkg.tar.zst` package directly. Pake follows Tauri's AUR packaging guidance by building the Linux package payload first, then emitting Arch package metadata and zstd-compressed output. Requires `binutils` (for `ar`) and `libarchive` (for `bsdtar`).
+
+#### [no-bundle]
+
+Skip packaging and output only the compiled executable. Linux only. Useful on RPM-based distros (Fedora, RHEL, Oracle Linux, etc.) where the native bundler can abort during the packaging stage, so you still get a runnable binary.
+
+```shell
+pake https://github.com --name GitHub --no-bundle
+```
+
+The raw executable is copied to the current directory as `<name>-binary`. On platforms other than Linux this flag is ignored.
 
 #### [user-agent]
 
@@ -367,6 +464,49 @@ pake https://github.com --name GitHub --keep-binary
 
 **Output**: Creates both installer and standalone executable (`AppName-binary` on Unix, `AppName.exe` on Windows).
 
+#### [iterative-build]
+
+Turn on rapid build mode (app only, no dmg/deb/msi), good for debugging. Default is `false`.
+
+```shell
+--iterative-build
+```
+
+#### [install]
+
+Install the built macOS app directly into `/Applications`. Default is `false`.
+
+This option is macOS-only and is intended for local development or quick testing. When enabled, Pake builds an `.app` bundle, copies it into `/Applications`, replaces any existing app with the same name, and removes the local bundle after a successful install. If the install fails, the local `.app` is kept in the current working directory.
+
+```shell
+--install
+
+# Example: Build and install directly to /Applications
+pake https://github.com --name GitHub --install
+```
+
+#### [camera]
+
+Request camera access on macOS by adding the `com.apple.security.device.camera` entitlement to the packaged app. Default is `false`. macOS only; ignored on Windows and Linux. Useful for web apps that need webcam access, such as video calls or QR scanning.
+
+```shell
+--camera
+
+# Example: Package a video-call site with camera access
+pake https://meet.google.com --name Meet --camera
+```
+
+#### [microphone]
+
+Request microphone access on macOS by adding the `com.apple.security.device.audio-input` entitlement to the packaged app. Default is `false`. macOS only; ignored on Windows and Linux.
+
+```shell
+--microphone
+
+# Example: Combine camera and microphone for a conferencing app
+pake https://meet.google.com --name Meet --camera --microphone
+```
+
 #### [multi-instance]
 
 Allow the packaged app to run more than one instance at the same time. Default is `false`, which means launching a second instance simply focuses the existing window. Enable this when you need to open several windows of the same app simultaneously.
@@ -378,9 +518,29 @@ Allow the packaged app to run more than one instance at the same time. Default i
 pake https://chat.example.com --name ChatApp --multi-instance
 ```
 
+#### [multi-window]
+
+Allow opening multiple windows within a single running app instance. Default is `false`.
+
+This is different from `--multi-instance`:
+
+- `--multi-instance`: starts multiple app processes.
+- `--multi-window`: keeps one process and opens extra windows from that process.
+
+When enabled, relaunching an already running app opens a new window instead of only focusing the existing one.
+
+This can improve popup-based authentication flows, but it cannot bypass provider policy. Some providers, especially Google, may still reject sign-in inside embedded webviews.
+
+```shell
+--multi-window
+
+# Example: Keep one process but open multiple windows
+pake https://chat.example.com --name ChatApp --multi-window
+```
+
 #### [installer-language]
 
-Set the Windows Installer language. Options include `zh-CN`, `ja-JP`, More at [Tauri Document](https://tauri.app/distribute/windows-installer/#internationalization). Default is `en-US`.
+Set the Windows Installer language. Options include `zh-CN`, `ja-JP`, More at [Tauri docs](https://v2.tauri.app/distribute/windows-installer/#internationalization). Default is `en-US`.
 
 ```shell
 --installer-language <language>
@@ -429,6 +589,24 @@ Enable developer tools and detailed logging for debugging.
 
 ```shell
 --debug
+```
+
+#### [ignore-certificate-errors]
+
+Ignore TLS certificate validation errors when loading the target URL. Useful for intranet apps, dev servers, or self-signed certificates.
+
+```shell
+--ignore-certificate-errors
+```
+
+#### [new-window]
+
+Allow sites to open new windows, such as authentication popups, extra tabs, or branch views.
+
+This can help sites that rely on popup auth windows, but it does not guarantee in-app sign-in. Some providers, especially Google, may block authentication inside embedded webviews regardless of this option.
+
+```shell
+--new-window
 ```
 
 ### Packaging Complete

@@ -2,6 +2,7 @@ import path from 'path';
 import BaseBuilder from './BaseBuilder';
 import { PakeAppOptions } from '@/types';
 import tauriConfig from '@/helpers/tauriConfig';
+import { generateIdentifierSafeName } from '@/utils/name';
 
 export default class WinBuilder extends BaseBuilder {
   private buildFormat: string = 'msi';
@@ -23,14 +24,6 @@ export default class WinBuilder extends BaseBuilder {
     return `${name}_${tauriConfig.version}_${targetArch}_${language}`;
   }
 
-  protected getArchDisplayName(arch: string): string {
-    // Windows uses 'arm64' in MSI filenames, not 'aarch64'
-    if (arch === 'arm64') {
-      return 'arm64';
-    }
-    return super.getArchDisplayName(arch);
-  }
-
   protected getBuildCommand(packageManager: string = 'pnpm'): string {
     const configPath = path.join('src-tauri', '.pake', 'tauri.conf.json');
     const buildTarget = this.getTauriTarget(this.buildArch, 'win32');
@@ -41,24 +34,18 @@ export default class WinBuilder extends BaseBuilder {
       );
     }
 
-    let fullCommand = this.buildBaseCommand(
-      packageManager,
-      configPath,
-      buildTarget,
-    );
-
-    const features = this.getBuildFeatures();
-    if (features.length > 0) {
-      fullCommand += ` --features ${features.join(',')}`;
-    }
-
-    return fullCommand;
+    return this.buildBaseCommand(packageManager, configPath, buildTarget);
   }
 
   protected getBasePath(): string {
     const basePath = this.options.debug ? 'debug' : 'release';
     const target = this.getTauriTarget(this.buildArch, 'win32');
-    return `src-tauri/target/${target}/${basePath}/bundle/`;
+    if (!target) {
+      throw new Error(
+        `Unsupported architecture: ${this.buildArch} for Windows`,
+      );
+    }
+    return path.join(this.getCargoTargetDir(), target, basePath, 'bundle');
   }
 
   protected hasArchSpecificTarget(): boolean {
@@ -67,6 +54,19 @@ export default class WinBuilder extends BaseBuilder {
 
   protected getArchSpecificPath(): string {
     const target = this.getTauriTarget(this.buildArch, 'win32');
-    return `src-tauri/target/${target}`;
+    if (!target) {
+      throw new Error(
+        `Unsupported architecture: ${this.buildArch} for Windows`,
+      );
+    }
+    return path.join(this.getCargoTargetDir(), target);
+  }
+
+  protected getRawBinaryPath(appName: string): string {
+    return `${appName}.exe`;
+  }
+
+  protected getBinaryName(appName: string): string {
+    return `pake-${generateIdentifierSafeName(appName)}.exe`;
   }
 }

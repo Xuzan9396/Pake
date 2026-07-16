@@ -1,4 +1,5 @@
 import { PakeCliOptions } from './types.js';
+import { getDefaultLinuxTargets } from './utils/platform.js';
 
 export const DEFAULT_PAKE_OPTIONS: PakeCliOptions = {
   icon: '',
@@ -8,6 +9,7 @@ export const DEFAULT_PAKE_OPTIONS: PakeCliOptions = {
   maximize: false,
   resizable: true,
   hideTitleBar: false,
+  hideWindowDecorations: false,
   alwaysOnTop: false,
   appVersion: '1.0.0',
   darkMode: false,
@@ -16,7 +18,18 @@ export const DEFAULT_PAKE_OPTIONS: PakeCliOptions = {
   userAgent: '',
   showSystemTray: false,
   multiArch: false,
-  targets: 'deb',
+  targets: (() => {
+    switch (process.platform) {
+      case 'linux':
+        return getDefaultLinuxTargets();
+      case 'darwin':
+        return 'dmg';
+      case 'win32':
+        return 'msi';
+      default:
+        return 'deb';
+    }
+  })(),
   useLocalFile: false,
   systemTrayIcon: '',
   proxyUrl: '',
@@ -27,15 +40,22 @@ export const DEFAULT_PAKE_OPTIONS: PakeCliOptions = {
   incognito: false,
   wasm: false,
   enableDragDrop: false,
+  bundle: true,
   keepBinary: false,
   multiInstance: false,
+  multiWindow: false,
   startToTray: false,
-};
-
-// Just for cli development
-export const DEFAULT_DEV_PAKE_OPTIONS: PakeCliOptions & { url: string } = {
-  ...DEFAULT_PAKE_OPTIONS,
-  url: 'https://weekly.tw93.fun/',
-  name: 'Weekly',
-  hideTitleBar: true,
+  forceInternalNavigation: false,
+  internalUrlRegex: '',
+  safeDomain: '',
+  enableFind: false,
+  iterativeBuild: false,
+  zoom: 100,
+  minWidth: 0,
+  minHeight: 0,
+  ignoreCertificateErrors: false,
+  newWindow: false,
+  install: false,
+  camera: false,
+  microphone: false,
 };

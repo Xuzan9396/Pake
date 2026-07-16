@@ -234,20 +234,45 @@ Create a new JSON file in this directory (e.g., `myapp.json`):
   "description": "Advanced app with custom styling"
 }
 ```
+手动构建 Apple Silicon macOS DMG：
 
-## Config Validation
+cd /Users/admin/go/rust/Pake
 
-Before building, ensure:
+pnpm install
+pnpm run cli:build
 
-- ✅ Icon file exists at specified path
-- ✅ URL is valid and accessible
-- ✅ Width/height are reasonable (min: 400, max: 4096)
-- ✅ At least one platform is enabled
-- ✅ Platform targets are valid
+node dist/cli.js "https://manage.discountmallvip.shop/" \
+--name "xuanpay" \
+--icon "./imgs/xuanpay-logo-132.png" \
+--width 1920 \
+--height 1080 \
+--targets apple \
+--debug
 
-## Tips
+最新版 Pake 在 macOS 默认生成 DMG。若只想生成 .app 测试：
 
-1. **Icon Path**: Use relative paths from project root (e.g., `./icons/app.png`)
-2. **Platform Targets**: Only enable targets you actually need to reduce build time
-3. **Testing**: Test locally before pushing tags
-4. **Multiple Apps**: Create separate config files for each app you want to package
+PAKE_CREATE_APP=1 node dist/cli.js "https://manage.discountmallvip.shop/" \
+--name "xuanpay" \
+--icon "./imgs/xuanpay-logo-132.png" \
+--width 1920 \
+--height 1080 \
+--targets apple \
+--debug
+
+构建结果会复制到项目根目录。生产发布建议把配置中的 "debug": true 改成 false，并移除命令里的 --debug。
+
+现有自定义工作流 .github/workflows/release-build.yaml 的发布方式是：
+
+git add build-configs/xuanpay.json imgs/xuanpay-logo-132.png
+git commit -m "feat: add xuanpay build config"
+git push origin main
+
+git tag xuanpay-v0.0.1 -m "Release xuanpay v0.0.1"
+git push origin xuanpay-v0.0.1
+
+推送该 Tag 后，工作流会：
+
+1. 读取 build-configs/xuanpay.json
+2. 在 macos-latest 构建 Apple Silicon .app
+3. 用 hdiutil 包装成 DMG
+4. 创建 GitHub Release 并上传 DMG

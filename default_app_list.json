@@ -1,5 +1,14 @@
 [
   {
+    "name": "wechat",
+    "title": "WeChat",
+    "name_zh": "微信",
+    "url": "https://wx.qq.com/",
+    "incognito": true,
+    "width": 1000,
+    "height": 720
+  },
+  {
     "name": "deepseek",
     "title": "DeepSeek",
     "name_zh": "DeepSeek",
@@ -24,6 +33,12 @@
     "url": "https://excalidraw.com/"
   },
   {
+    "name": "notion",
+    "title": "Notion",
+    "name_zh": "Notion",
+    "url": "https://app.notion.com"
+  },
+  {
     "name": "programmusic",
     "title": "ProgramMusic",
     "name_zh": "ProgramMusic",
@@ -33,7 +48,7 @@
     "name": "twitter",
     "title": "Twitter",
     "name_zh": "推特",
-    "url": "https://twitter.com/"
+    "url": "https://x.com/"
   },
   {
     "name": "youtube",
@@ -63,7 +78,7 @@
     "name": "lizhi",
     "title": "LiZhi",
     "name_zh": "李志",
-    "url": "https://lizhi.turkyden.com/?from=pake"
+    "url": "https://lizhi.dengdengju.com/?from=pake"
   },
   {
     "name": "xiaohongshu",
