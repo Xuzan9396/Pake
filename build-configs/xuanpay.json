@@ -1,0 +1,29 @@
+{
+  "name": "xuanpay",
+  "url": "https://manage.discountmallvip.shop/",
+  "icon": "./imgs/xuanpay-logo-132.png",
+  "width": 1920,
+  "height": 1080,
+  "platforms": {
+    "macos": {
+      "enabled": true,
+      "targets": ["apple"]
+    },
+    "windows": {
+      "enabled": true,
+      "targets": ["x64"]
+    },
+    "linux": {
+      "enabled": false,
+      "targets": ["deb", "appimage"]
+    }
+  },
+  "options": {
+    "fullscreen": false,
+    "resizable": true,
+    "transparent": false,
+    "alwaysOnTop": false,
+    "hideTitleBar": false,
+    "debug": false
+  }
+}
