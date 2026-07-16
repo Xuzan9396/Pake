@@ -286,8 +286,8 @@ git add build-configs/xuanpay.json imgs/xuanpay-logo-132.png
 git commit -m "feat: add xuanpay build config"
 git push origin main
 
-git tag xuanpay-v0.0.1 -m "Release xuanpay v0.0.1"
-git push origin xuanpay-v0.0.1
+git tag xuanpay-v2.0.0 -m "Release xuanpay"
+git push origin xuanpay-v2.0.0
 
 推送该 Tag 后，工作流会：
 
